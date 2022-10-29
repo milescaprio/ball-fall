@@ -66,15 +66,23 @@ impl std::ops::Div for Units {
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
 pub enum EvalFunctionError {
+    OutsideDomain,
+    Imaginary
+}
+
+pub enum FunctionCompatibilityError {
     InvalidUnits,
     InvalidVar,
-    DividedByZero,
+}
+
+pub enum FunctionError {
+    FunctionCompatibilityError(FunctionCompatibilityError),
+    EvalFunctionError(EvalFunctionError)
 }
 
 pub trait Function {
     fn var_units(&self) -> Units;
     fn var(&self) -> Var;
-    fn eval(&self, input: f32) -> Result<f32>;
     fn check_input_eval(&self, input: f32, var : Var, units : Units) -> Result<f32,EvalFunctionError> {
         if self.var_units() == units {
             if self.var() == var {
@@ -87,7 +95,8 @@ pub trait Function {
         }
     }
     fn check_units(&self) -> bool;
-    fn compile(&self) -> fn(f32) -> f32;
+    fn compile(&self) -> fn(f32) -> Result<f32,;
+    unsafe fn quick_compile(&self) -> fn(f32) -> f32;
     // fn simplify(&mut self);
     // fn simplification(&self) -> Self;
     // fn simplify_units(&mut self);
