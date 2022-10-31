@@ -1,4 +1,4 @@
-mod kinematics;
+use super::kinematics::*;
 const GRAVITY_MPS2: f32 = -9.81;
 
 struct Ball {
