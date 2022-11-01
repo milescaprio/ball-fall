@@ -25,7 +25,7 @@ pub struct Units {
 }
 
 impl Unit {
-    pub fn Units(&self) -> Units {
+    pub fn units(&self) -> Units {
         let mut ret = Units::empty();
         ret.exponents[*self as usize] = 1;
         ret
@@ -250,7 +250,7 @@ impl Differentiable for Polynomial {
                     derivative.push(Monomial::init(monomial.coefficient * monomial.exponent as f32, monomial.units_coefficient, monomial.exponent - 1));
                 }    
             }    
-            Ok(Box::new(Polynomial::init(self.var, self.var_units, self.final_units, derivative)))
+            Ok(Box::new(Polynomial::init(self.var, self.var_units, self.final_units / self.var_units, derivative)))
         } else {
             Err(DiffrientiationError::ProhibitedRespect)
         }    
@@ -264,7 +264,7 @@ impl Integrable for Polynomial {
             for monomial in &self.expression {
                 integral.push(Monomial::init(monomial.coefficient / (monomial.exponent + 1) as f32, monomial.units_coefficient, monomial.exponent + 1));
             }    
-            Ok(Box::new(Polynomial::init(self.var, self.var_units, self.final_units, integral)))
+            Ok(Box::new(Polynomial::init(self.var, self.var_units, self.final_units * self.var_units, integral)))
         } else {
             Err(IntegrationError::ProhibitedRespect)
         }    
@@ -279,13 +279,13 @@ mod tests {
     #[test]
     fn construct_units() {
         let meter = Unit::M;
-        let meters = meter.Units();
+        let meters = meter.units();
         assert_eq!(meters.exponents[Unit::M as usize], 1);
     }
     #[test]
     fn construct_monomial() {
         let meter = Unit::M;
-        let meters = meter.Units();
+        let meters = meter.units();
         let none = Units::empty();
         let slope = Monomial::init(2.0, none, 1);
         assert_eq!(slope.coefficient, 2.0);
@@ -295,7 +295,7 @@ mod tests {
     #[test]
     fn construct_polynomial() {
         let meter = Unit::M;
-        let meters = meter.Units();
+        let meters = meter.units();
         let none = Units::empty();
         let slope = Monomial::init(2.0, none, 1);
         let polynomial = Polynomial::init(Var::X, meters, meters, vec![slope]);
@@ -309,7 +309,7 @@ mod tests {
     #[test]
     fn polynomial_compile_eval() {
         let meter = Unit::M;
-        let meters = meter.Units();
+        let meters = meter.units();
         let none = Units::empty();
         let slope = Monomial::init(2.0, none, 1);
         let intercept = Monomial::init(3.0, meters, 0);
@@ -320,7 +320,7 @@ mod tests {
     #[should_panic]
     fn polynomial_compile_fail() {
         let meter = Unit::M;
-        let meters = meter.Units();
+        let meters = meter.units();
         let none = Units::empty();
         let slope = Monomial::init(2.0, none, 1);
         let intercept = Monomial::init(3.0, meters, 0);
@@ -330,7 +330,7 @@ mod tests {
     #[test]
     fn polynomial_differentiate() {
         let meter = Unit::M;
-        let meters = meter.Units();
+        let meters = meter.units();
         let none = Units::empty();
         let slope = Monomial::init(2.0, none, 1);
         let intercept = Monomial::init(3.0, meters, 0);
@@ -341,12 +341,12 @@ mod tests {
     #[test]
     fn polynomial_integrate() {
         let meter = Unit::M;
-        let meters = meter.Units();
+        let meters = meter.units();
         let none = Units::empty();
         let slope = Monomial::init(2.0, none, 1);
         let intercept = Monomial::init(3.0, meters, 0);
         let polynomial = Polynomial::init(Var::X, meters, meters, vec![slope, intercept]);
         let integral = polynomial.integrate_c(Var::X, 0.0).unwrap();
-        assert_eq!(integral.compile().unwrap()(1.0).unwrap(), 3.5);
+        assert_eq!(integral.compile().unwrap()(1.0).unwrap(), 4.0);
     }
 }

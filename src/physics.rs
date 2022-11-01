@@ -8,9 +8,10 @@ struct Ball {
     vy: f32,
     radius: f32,
     mass: f32,
-    fx: fn(f32) -> f32,
+    fx: fn(f32) -> f32, //respect to time
     fy: fn(f32) -> f32,
-    cached_position_Function : impl Function,
+    cached_x_Function : Box<dyn Function>,
+    cached_y_Function : Box<dyn Function>,
 }
 
 struct Space {
