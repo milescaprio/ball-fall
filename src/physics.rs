@@ -52,6 +52,7 @@ impl Ball {
             let cached_d_Function = f .integrate().unwrap().integrate().unwrap();
             cached_x_Function = cached_d_Function.mult_const(a.xy_h(1).0);
             cached_y_Function = cached_d_Function.mult_const(a.xy_h(1).1);
+            self.soft_update_quick();
         }
         else if let accel_xy_function::IndependentFunctions(fx, fy) = self.fx {
             cached_x_Function = fx.integrate().unwrap().integrate().unwrap();
@@ -61,10 +62,6 @@ impl Ball {
         else if let accel_xy_function::CompositeAcceleration(f, a) = self.fx {
             //idk yet
         }
-        self.cached_x_Function = ;
-        self.cached_y_Function = Box::new(fy);
-        self.x = x;
-        self.y = y;
     }
 }
 
