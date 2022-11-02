@@ -10,8 +10,8 @@ struct Ball {
     mass: f32,
     fx: fn(f32) -> f32, //respect to time
     fy: fn(f32) -> f32,
-    cached_x_Function : Box<dyn Function>,
-    cached_y_Function : Box<dyn Function>,
+    cached_x_Function : Box<dyn kinematics::Function>,
+    cached_y_Function : Box<dyn kinematics::Function>,
 }
 
 struct Angle {
@@ -31,37 +31,57 @@ impl Angle {
 enum accel_xy_function {
     ParterFunctionVector(Box<dyn kinematics::Function>, Angle),
     IndependentFunctions(Box<dyn kinematics::Function>, Box<dyn kinematics::Function>),
-    CompositeAcceleration(Self::ParterFunctionVector, Self::IndependentFunctions),
+    CompositeAcceleration(accel_xy_function, accel_xy_function),
 }
 
 impl Ball {
-    fn soft_update_quick(&mut self) {
-        fx = cached_x_Function.quick_compile();
-        fy = cached_y_Function.quick_compile();
+    pub fn soft_update_unchecked(&mut self) { 
+        //use when data hasnt been recently injected and checking isn't worth
+        //not checking won't result in unsafe code but could create odd function behavior
+        fx = cached_x_Function.compile_unchecked();
+        fy = cached_y_Function.compile_unchecked();
         self.x = x;
         self.y = y;
     }
-    fn soft_update(&mut self) -> Result<(), FunctionInternalError> {
+    pub fn soft_update(&mut self) -> Result<(), FunctionInternalError> {
         fx = cached_x_Function.compile()?;
         fy = cached_y_Function.compile()?;
         self.x = x;
         self.y = y;
     }
-    fn hard_update_quick(&mut self) {
-        if let accel_xy_function::ParterFunctionVector(f, a) = self.fx {
-            let cached_d_Function = f .integrate().unwrap().integrate().unwrap();
-            cached_x_Function = cached_d_Function.mult_const(a.xy_h(1).0);
-            cached_y_Function = cached_d_Function.mult_const(a.xy_h(1).1);
-            self.soft_update_quick();
+    pub fn hard_update_unchecked(&mut self) {
+        todo!()
+        if let accel_xy_function::ParterFunctionVector(a, d) = self.a {
+            let cached_d_Function = a .integrate().unwrap().integrate().unwrap();
+            self.cached_x_Function = cached_d_Function.mult_const(d.xy_h(1).0);
+            self.cached_y_Function = cached_d_Function.mult_const(d.xy_h(1).1);
+            self.soft_update_unchecked();
         }
-        else if let accel_xy_function::IndependentFunctions(fx, fy) = self.fx {
-            cached_x_Function = fx.integrate().unwrap().integrate().unwrap();
-            cached_y_Function = fy.integrate().unwrap().integrate().unwrap();
-            self.soft_update_quick();
+        else if let accel_xy_function::IndependentFunctions(ax, ay) = self.a {
+            self.cached_x_Function = ax.integrate().unwrap().integrate().unwrap();
+            self.cached_y_Function = ay.integrate().unwrap().integrate().unwrap();
+            self.soft_update_unchecked();
         }
-        else if let accel_xy_function::CompositeAcceleration(f, a) = self.fx {
-            //idk yet
+        //else if let accel_xy_function::CompositeAcceleration(a1, a2) = self.a {
+            //self.cached_x_Function = kinematics::SumFunction()
+        //}
+    }
+    fn recurhelper_hard_update_unchecked(&accel_xy_function : a) -> (Box<dyn kinematics::Function>, Box<dyn kinematics::Function>) {
+        todo!()
+        if let accel_xy_function::ParterFunctionVector(a, d) = a {
+            let cached_d_Function = a .integrate().unwrap().integrate().unwrap();
+            self.cached_x_Function = cached_d_Function.mult_const(d.xy_h(1).0);
+            self.cached_y_Function = cached_d_Function.mult_const(d.xy_h(1).1);
+            self.soft_update_unchecked();
         }
+        else if let accel_xy_function::IndependentFunctions(ax, ay) = self.a {
+            self.cached_x_Function = ax.integrate().unwrap().integrate().unwrap();
+            self.cached_y_Function = ay.integrate().unwrap().integrate().unwrap();
+            self.soft_update_unchecked();
+        }
+        //else if let accel_xy_function::CompositeAcceleration(a1, a2) = self.a {
+            //self.cached_x_Function = kinematics::SumFunction()
+        //}
     }
 }
 
@@ -77,17 +97,17 @@ struct Space {
     a : accel_xy_function,
     pixelx: fn(f32) -> usize,
 
-    elapsed_time: f32,
+    elapsed: f32,
     pub balls: Vec<Ball>,
 }
 
 impl Space {
     fn tick(&mut self, dt: f32) {
-        self.elapsed_time += dt;
+        self.elapsed += dt;
         for ball in &mut self.balls {
             //keep track of the cached calculus functions
             //check if last acceleration for ball was different and then recompile the cached calculus polynomial if so
-            let (x, y) = ball.position(self.elapsed_time);
+            let (x, y) = (ball.fx(self.elapsed), ball.fy(self.elapsed);
         }
     }
 }

@@ -115,13 +115,15 @@ pub enum IntegrationError {
 
 pub trait Function {
     fn var_units(&self) -> Units;
+    fn final_units(&self) -> Units;
     fn var(&self) -> Var;
     fn check(&self) -> Result<(),FunctionInternalError>;
+    fn check_recursive(&self) -> Result<(), FunctionInternalError>;
     fn compile(&self) -> Result<Box<dyn Fn(f32) -> Result<f32,EvalFunctionError>>, FunctionInternalError> {
-        self.check()?;
-        unsafe {Ok(self.quick_compile())}
+        self.check_recursive()?;
+        Ok(self.compile_unchecked()))
     }
-    unsafe fn quick_compile(&self) -> Box<dyn Fn(f32) -> Result<f32,EvalFunctionError>>;
+    fn compile_unchecked(&self) -> Box<dyn Fn(f32) -> Result<f32,EvalFunctionError>>;
     fn check_input(&self, var : Var, units : Units) -> Result<(),FunctionCompatibilityError> {
         if self.var_units() == units {
             if self.var() == var {
@@ -132,7 +134,10 @@ pub trait Function {
         } else {
             Err(FunctionCompatibilityError::InvalidUnits)
         }    
-    }    
+    }
+    fn mult_const(&self) -> Box<dyn Function>;
+        //if your function is for some reason not able to handle coefficients, you can return a different type,
+        //like a composite or product function type
     // fn simplify(&mut self);
     // fn simplification(&self) -> Self;
     // fn simplify_units(&mut self);
@@ -141,20 +146,24 @@ pub trait Function {
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
-enum Functions {
+enum KinematicsFunctions {
     Polynomial(Polynomial),
+    SumFunction(SumFunction),
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
-trait Integrable {
+//todo: make these checked/unchecked, forcing implementation of both checked and unchecked for odd functions
+//to figure out their own FullyUnintegrable/FullyUndifferentiable/UnknownResultFormat errors in the checked version or use make a PartialIntegrable for functions that are sometimes integrable and require an errored version
+
+pub trait Integrable {
     fn integrate_c(&self, respect : Var, c : f32) -> Result<Box<dyn Function>, IntegrationError>;
     fn integrate(&self, respect : Var) -> Result<Box<dyn Function>, IntegrationError> {
         self.integrate_c(respect, 0.0)
     }
 }
 
-trait Differentiable {
+pub trait Differentiable {
     fn differentiate(&self, respect : Var) -> Result<Box<dyn Function>, DiffrientiationError>;
 }
 
@@ -203,26 +212,28 @@ impl Function for Polynomial {
     fn var(&self) -> Var {
         self.var
     }    
-    // fn eval(&self, input: f32) -> Result<f32, EvalFunctionError> { //use for compile
-    //     let mut result = 0.0;    
-    //     for monomial in self.expression {
-    //         result += monomial.coefficient * input.powi(monomial.exponent);    
-    //     }
-    //     Ok(result)
-    // }
+    fn final_units(&self) -> Units {
+        self.final_units
+    }
     fn check(&self) -> Result<(),FunctionInternalError> {
+        let mut i = 0;
         for monomial in &self.expression {
             if monomial.units_coefficient * self.var_units().pow(monomial.exponent) != self.final_units {
-                //println!("{:#?} * {:#?} != {:#?}", monomial.units_coefficient, self.var_units().pow(monomial.exponent), self.final_units);
                 return Err(FunctionInternalError::UnitMismatch);
             }    
-            if monomial.exponent < 0 {
-                return Err(FunctionInternalError::SpecificFunctionError("NegativeExponent"));
-            }    
+            if monomial.exponent != i {
+                if monomial.exponent < 0 {
+                    return Err(FunctionInternalError::SpecificFunctionError("NegativeExponent"));
+                }
+                return Err(FunctionInternalError::SpecificFunctionError("UnsortedPolynomial"))
+            }
         }    
         Ok(())
-    }    
-    unsafe fn quick_compile(&self) -> Box<dyn Fn(f32) -> Result<f32,EvalFunctionError>> {
+    }
+    fn check_recursive(&self) -> Result<(), FunctionInternalError> {
+        self.check()
+    }
+    fn compile_unchecked(&self) -> Box<dyn Fn(f32) -> Result<f32,EvalFunctionError>> {
         let mut evalexpr : Vec<f32> = Vec::new();
         for monomial in &self.expression {
             if evalexpr.len() < (monomial.exponent + 1) as usize {
@@ -238,7 +249,14 @@ impl Function for Polynomial {
             Ok(result)
         })    
     }    
-    //need to implement compilation to delta position closure 
+    fn mult_const(&self, n : f32) -> Box<Polynomial> {
+        let mut product : Vec<Monomial> = Vec::new();
+        let mut ret = self.clone()
+        for monomial in &ret {
+            monomial.coefficient *= n;
+        }    
+        ret
+    }
 }    
 
 impl Differentiable for Polynomial {
@@ -248,7 +266,7 @@ impl Differentiable for Polynomial {
             for monomial in &self.expression {
                 if monomial.exponent != 0 {
                     derivative.push(Monomial::init(monomial.coefficient * monomial.exponent as f32, monomial.units_coefficient, monomial.exponent - 1));
-                }    
+                } 
             }    
             Ok(Box::new(Polynomial::init(self.var, self.var_units, self.final_units / self.var_units, derivative)))
         } else {
@@ -264,12 +282,107 @@ impl Integrable for Polynomial {
             for monomial in &self.expression {
                 integral.push(Monomial::init(monomial.coefficient / (monomial.exponent + 1) as f32, monomial.units_coefficient, monomial.exponent + 1));
             }    
+            integral[0] += c;
             Ok(Box::new(Polynomial::init(self.var, self.var_units, self.final_units * self.var_units, integral)))
         } else {
             Err(IntegrationError::ProhibitedRespect)
         }    
     }    
 }
+
+pub struct SumFunction {
+    function1 : Box<dyn Function>,
+    function2 : Box<dyn Function>,
+    pub var : Var,
+    pub var_units : Units,
+    pub final_units : Units,
+}
+
+impl SumFunction {
+    pub fn init(var: Var, var_units : Units, final_units : Units, f1 : Box<dyn Function>, f2 : Box<dyn Function>) -> Self {
+        Polynomial {
+            function1 : f1,
+            function2 : f2,
+            var,
+            var_units,
+            final_units
+        }    
+    }
+}
+
+impl Function for SumFunction {
+    fn var() -> Var {
+        self.var
+    }
+    fn var_units -> Units {
+        self.var_units
+    }
+    fn final_units -> Units {
+        self.final_units
+    }
+    fn check(&self) -> Result<(), FunctionInternalError> {
+        if  f1.var_units   != self.var_units   || f2.var_units   != self.var_units   ||
+            f1.final_units != self.final_units || f2.final_units != self.final_units ||
+            f1.var         != self.var         || f2.var         != self.var {
+            return Err(FunctionInternalError::UnitMismatch);
+        }
+        Ok(())
+    }
+    fn check_recursive(&self) -> Result<(), FuncitonInternalError> {
+        self.f1.check()?;
+        self.f2.check()?;
+        self.check()
+    }
+    fn compile_unchecked(&self) -> Box<dyn Fn(f32) -> Result<f32,EvalFunctionError>> {
+        let closure1 = self.f1.compile_unchecked();
+        let closure2 = self.f2.compile_unchecked()
+        move |x| {
+            closure1(x) + closure2(x)
+        }
+    }
+    fn mult_const(&self, n : f32) -> Box<SumFunction> {
+        SumFunction {
+            var : self.var,
+            var_units : self.var_units,
+            final_units : self.final_units,
+            f1 : self.f1.mult_const(n),
+            f2 : self.f2.mult_const(n),
+        }
+    }
+}
+
+impl Differentiable for SumFunction {
+    fn differentiate(&self, respect : Var) -> Result<Box<dyn Function>, DiffrientiationError> {
+        if respect == self.var {
+            Ok(SumFunction {
+                var : self.var,
+                var_units : self.var_units,
+                final_units : self.final_units,
+                f1 : self.f1.differentiate(),
+                f2 : self.f2.differentiate(),
+            })
+        } else {
+            Err(DiffrientiationError::ProhibitedRespect)
+        }    
+    }    
+}    
+
+impl Integrable for Polynomial {
+    fn integrate_c(&self, respect : Var, c : f32) -> Result<Box<dyn Function>, IntegrationError> { //preferably the function that is easier to add c to should go in f2; use bigger/more complex function first
+        if respect == self.var {
+            Ok(SumFunction {
+                var : self.var,
+                var_units : self.var_units,
+                final_units : self.final_units,
+                f1 : self.f1.integrate(),
+                f2 : self.f2.integrate_c(c),
+            }])
+        } else {
+            Err(IntegrationError::ProhibitedRespect)
+        }    
+    }    
+}
+
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
