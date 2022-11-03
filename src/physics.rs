@@ -1,4 +1,5 @@
 use super::kinematics;
+use kinematics::Function;
 const GRAVITY_MPS2: f32 = -9.81;
 
 struct Ball {
@@ -35,6 +36,7 @@ enum accel_xy_function {
 }
 
 impl Ball {
+    use 
     pub fn soft_update_unchecked(&mut self) { 
         //use when data hasnt been recently injected and checking isn't worth
         //not checking won't result in unsafe code but could create odd function behavior
@@ -66,9 +68,9 @@ impl Ball {
             //self.cached_x_Function = kinematics::SumFunction()
         //}
     }
-    fn recurhelper_hard_update_unchecked(&accel_xy_function : a) -> (Box<dyn kinematics::Function>, Box<dyn kinematics::Function>) {
-        todo!()
-        if let accel_xy_function::ParterFunctionVector(a, d) = a {
+    fn recurhelper_hard_update_unchecked(&accel_xy_function : a_ref) -> (Box<dyn kinematics::Function>, Box<dyn kinematics::Function>) {
+        let mut ret : Box<dyn kinematics::, kinematics::Polynomial::new()
+        if let accel_xy_function::ParterFunctionVector(a, d) = a_ref {
             let cached_d_Function = a .integrate().unwrap().integrate().unwrap();
             self.cached_x_Function = cached_d_Function.mult_const(d.xy_h(1).0);
             self.cached_y_Function = cached_d_Function.mult_const(d.xy_h(1).1);
