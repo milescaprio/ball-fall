@@ -111,24 +111,6 @@ impl Ball {
             )
         }
     }
-    // fn recurhelper_soft_update_unchecked(&accel_xy_function : a_ref) -> Result<(Box<dyn Function>, Box<dyn Function>), FunctionInternalError> {\
-    //     //this never work i was just thinking about it lol
-    //     let mut ret_xy : (Box<dyn Function>, Box<dyn Function>); 
-    //     if let accel_xy_function::ParterFunctionVector(a, d) = a_ref {
-    //         let cached_d_Function = a .integrate().unwrap().integrate().unwrap();
-    //         ret_xy.0 = cached_d_Function.mult_const(d.xy_h(1).0);
-    //         ret_xy.1 = cached_d_Function.mult_const(d.xy_h(1).1);
-    //         self.soft_update_unchecked();
-    //     }
-    //     else if let accel_xy_function::IndependentFunctions(ax, ay) = a_ref {
-    //         ret_xy.0 = ax.integrate().unwrap().integrate().unwrap();
-    //         ret_xy.1 = ay.integrate().unwrap().integrate().unwrap();
-    //         self.soft_update_unchecked();
-    //     }
-    //     //else if let accel_xy_function::CompositeAcceleration(a1, a2) = self.a {
-    //         //self.cached_x_Function = kinematics::SumFunction()
-    //     //}
-    // }
 }
 
 impl Space {
