@@ -1,5 +1,6 @@
 use super::kinematics;
 use kinematics::Function;
+use kinematics::SumFunction;
 const GRAVITY_MPS2: f32 = -9.81;
 
 struct Ball {
@@ -11,8 +12,8 @@ struct Ball {
     mass: f32,
     fx: fn(f32) -> f32, //respect to time
     fy: fn(f32) -> f32,
-    cached_x_Function : Box<dyn kinematics::Function>,
-    cached_y_Function : Box<dyn kinematics::Function>,
+    cached_x_Function : Box<dyn Function>,
+    cached_y_Function : Box<dyn Function>,
 }
 
 struct Angle {
@@ -30,13 +31,12 @@ impl Angle {
 }
 
 enum accel_xy_function {
-    ParterFunctionVector(Box<dyn kinematics::Function>, Angle),
-    IndependentFunctions(Box<dyn kinematics::Function>, Box<dyn kinematics::Function>),
+    ParterFunctionVector(Box<dyn Function>, Angle),
+    IndependentFunctions(Box<dyn Function>, Box<dyn Function>),
     CompositeAcceleration(accel_xy_function, accel_xy_function),
 }
 
 impl Ball {
-    use 
     pub fn soft_update_unchecked(&mut self) { 
         //use when data hasnt been recently injected and checking isn't worth
         //not checking won't result in unsafe code but could create odd function behavior
@@ -52,7 +52,6 @@ impl Ball {
         self.y = y;
     }
     pub fn hard_update_unchecked(&mut self) {
-        todo!()
         if let accel_xy_function::ParterFunctionVector(a, d) = self.a {
             let cached_d_Function = a .integrate().unwrap().integrate().unwrap();
             self.cached_x_Function = cached_d_Function.mult_const(d.xy_h(1).0);
@@ -63,28 +62,57 @@ impl Ball {
             self.cached_x_Function = ax.integrate().unwrap().integrate().unwrap();
             self.cached_y_Function = ay.integrate().unwrap().integrate().unwrap();
             self.soft_update_unchecked();
+        } else if let accel_xy_function::CompositeAcceleration(a1, a2) = self.a {
+            //we have two accelerations and need to integrate each parts individually, both xnet and ynet
+            //we calculate x and y from a1 and x and y from a2 recursively then throw them into a self.cached_x_Function and self.cached_y_Function
+            xy1 = self.recurhelper_hard_update_unchecked(a1);
+            xy2 = self.recurhelper_hard_update_unchecked(a2);
+            self.cached_x_Function = kinematics::SumFunction(xy1.0,xy2.0);
+            self.cached_y_Function = kinematics::SumFunction(xy1.1,xy2.1);
+            self.soft_update_unchecked();
         }
-        //else if let accel_xy_function::CompositeAcceleration(a1, a2) = self.a {
-            //self.cached_x_Function = kinematics::SumFunction()
-        //}
     }
-    fn recurhelper_hard_update_unchecked(&accel_xy_function : a_ref) -> (Box<dyn kinematics::Function>, Box<dyn kinematics::Function>) {
-        let mut ret : Box<dyn kinematics::, kinematics::Polynomial::new()
+    fn recurhelper_hard_update_unchecked(&self, &accel_xy_function : a_ref) -> (Box<dyn Function>, Box<dyn Function>) {
         if let accel_xy_function::ParterFunctionVector(a, d) = a_ref {
             let cached_d_Function = a .integrate().unwrap().integrate().unwrap();
-            self.cached_x_Function = cached_d_Function.mult_const(d.xy_h(1).0);
-            self.cached_y_Function = cached_d_Function.mult_const(d.xy_h(1).1);
-            self.soft_update_unchecked();
+            return (
+                cached_d_Function.mult_const(d.xy_h(1).0),
+                ret_xy.1 = cached_d_Function.mult_const(d.xy_h(1).1)
+            );
         }
-        else if let accel_xy_function::IndependentFunctions(ax, ay) = self.a {
-            self.cached_x_Function = ax.integrate().unwrap().integrate().unwrap();
-            self.cached_y_Function = ay.integrate().unwrap().integrate().unwrap();
-            self.soft_update_unchecked();
+        else if let accel_xy_function::IndependentFunctions(ax, ay) = a_ref {
+            return (
+                ax.integrate().unwrap().integrate().unwrap(),
+                ay.integrate().unwrap().integrate().unwrap()
+            );
         }
-        //else if let accel_xy_function::CompositeAcceleration(a1, a2) = self.a {
-            //self.cached_x_Function = kinematics::SumFunction()
-        //}
+        else if let accel_xy_function::CompositeAcceleration(a1, a2) = self.a {
+            xy1 = self.recurhelper_hard_update_unchecked(a1);
+            xy2 = self.recurhelper_hard_update_unchecked(a2);
+            (
+                kinematics::SumFunction(xy1.0,xy2.0),
+                kinematics::SumFunction(xy1.1,xy2.1)
+            )
+        }
     }
+    // fn recurhelper_soft_update_unchecked(&accel_xy_function : a_ref) -> Result<(Box<dyn Function>, Box<dyn Function>), FunctionInternalError> {\
+    //     //this never work i was just thinking about it lol
+    //     let mut ret_xy : (Box<dyn Function>, Box<dyn Function>); 
+    //     if let accel_xy_function::ParterFunctionVector(a, d) = a_ref {
+    //         let cached_d_Function = a .integrate().unwrap().integrate().unwrap();
+    //         ret_xy.0 = cached_d_Function.mult_const(d.xy_h(1).0);
+    //         ret_xy.1 = cached_d_Function.mult_const(d.xy_h(1).1);
+    //         self.soft_update_unchecked();
+    //     }
+    //     else if let accel_xy_function::IndependentFunctions(ax, ay) = a_ref {
+    //         ret_xy.0 = ax.integrate().unwrap().integrate().unwrap();
+    //         ret_xy.1 = ay.integrate().unwrap().integrate().unwrap();
+    //         self.soft_update_unchecked();
+    //     }
+    //     //else if let accel_xy_function::CompositeAcceleration(a1, a2) = self.a {
+    //         //self.cached_x_Function = kinematics::SumFunction()
+    //     //}
+    // }
 }
 
 struct Space {
