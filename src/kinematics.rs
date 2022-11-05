@@ -121,7 +121,7 @@ pub trait Function {
     fn check_recursive(&self) -> Result<(), FunctionInternalError>;
     fn compile(&self) -> Result<Box<dyn Fn(f32) -> Result<f32,EvalFunctionError>>, FunctionInternalError> {
         self.check_recursive()?;
-        Ok(self.compile_unchecked()))
+        Ok(self.compile_unchecked())
     }
     fn compile_unchecked(&self) -> Box<dyn Fn(f32) -> Result<f32,EvalFunctionError>>;
     fn check_input(&self, var : Var, units : Units) -> Result<(),FunctionCompatibilityError> {
@@ -135,7 +135,7 @@ pub trait Function {
             Err(FunctionCompatibilityError::InvalidUnits)
         }    
     }
-    fn mult_const(&self) -> Box<dyn Function>;
+    fn mult_const(&self, n : f32) -> Box<dyn Function>;
         //if your function is for some reason not able to handle coefficients, you can return a different type,
         //like a composite or product function type
     // fn simplify(&mut self);
@@ -251,7 +251,7 @@ impl Function for Polynomial {
     }    
     fn mult_const(&self, n : f32) -> Box<Polynomial> {
         let mut product : Vec<Monomial> = Vec::new();
-        let mut ret = self.clone()
+        let mut ret = self.clone();
         for monomial in &ret {
             monomial.coefficient *= n;
         }    
@@ -291,8 +291,8 @@ impl Integrable for Polynomial {
 }
 
 pub struct SumFunction {
-    function1 : Box<dyn Function>,
-    function2 : Box<dyn Function>,
+    f1 : Box<dyn Function>,
+    f2 : Box<dyn Function>,
     pub var : Var,
     pub var_units : Units,
     pub final_units : Units,
@@ -301,11 +301,11 @@ pub struct SumFunction {
 impl SumFunction {
     pub fn init(var: Var, var_units : Units, final_units : Units, f1 : Box<dyn Function>, f2 : Box<dyn Function>) -> Self {
         Polynomial {
-            function1 : f1,
-            function2 : f2,
+            f1,
+            f2,
             var,
             var_units,
-            final_units
+            final_units,
         }    
     }
 }
@@ -351,32 +351,32 @@ impl Function for SumFunction {
     }
 }
 
-impl Differentiable for SumFunction {
+impl Differentiable for SumFunction where self.f1 : Differentiable, self.f2 : Differentiable {
     fn differentiate(&self, respect : Var) -> Result<Box<dyn Function>, DiffrientiationError> {
         if respect == self.var {
-            Ok(SumFunction {
+            Ok(Box::new(SumFunction {
                 var : self.var,
                 var_units : self.var_units,
                 final_units : self.final_units,
                 f1 : self.f1.differentiate(),
                 f2 : self.f2.differentiate(),
-            })
+            }))
         } else {
             Err(DiffrientiationError::ProhibitedRespect)
         }    
     }    
 }    
 
-impl Integrable for Polynomial {
+impl Integrable for SumFunction where self.f1 : Integrable, self.f2 : Integrable {
     fn integrate_c(&self, respect : Var, c : f32) -> Result<Box<dyn Function>, IntegrationError> { //preferably the function that is easier to add c to should go in f2; use bigger/more complex function first
         if respect == self.var {
-            Ok(SumFunction {
+            Ok(Box::new(SumFunction {
                 var : self.var,
                 var_units : self.var_units,
                 final_units : self.final_units,
                 f1 : self.f1.integrate(),
                 f2 : self.f2.integrate_c(c),
-            }])
+            }))
         } else {
             Err(IntegrationError::ProhibitedRespect)
         }    
