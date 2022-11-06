@@ -138,18 +138,14 @@ pub trait Function {
     fn mult_const(&self, n : f32) -> Box<dyn Function>;
         //if your function is for some reason not able to handle coefficients, you can return a different type,
         //like a composite or product function type
-    // fn simplify(&mut self);
-    // fn simplification(&self) -> Self;
-    // fn simplify_units(&mut self);
-    // fn simplification_units(&self) -> Self;
 }    
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
-enum KinematicsFunctions {
-    Polynomial(Polynomial),
-    SumFunction(SumFunction),
-}
+// enum KinematicsFunctions { //use Box<dyn Function> instead
+//     Polynomial(Polynomial),
+//     SumFunction(SumFunction),
+// }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
@@ -290,17 +286,17 @@ impl Integrable for Polynomial {
     }    
 }
 
-pub struct SumFunction {
-    f1 : Box<dyn Function>,
-    f2 : Box<dyn Function>,
+pub struct SumFunction<T1 : Function + ?Sized, T2 : Function + ?Sized> {
+    f1 : Box<T1>,
+    f2 : Box<T2>,
     pub var : Var,
     pub var_units : Units,
     pub final_units : Units,
 }
 
-impl SumFunction {
-    pub fn init(var: Var, var_units : Units, final_units : Units, f1 : Box<dyn Function>, f2 : Box<dyn Function>) -> Self {
-        Polynomial {
+impl<T1 : Function + ?Sized, T2 : Function + ?Sized> SumFunction<T1, T2> {
+    pub fn init(var: Var, var_units : Units, final_units : Units, f1 : T1, f2 : T2) -> Self {
+        SumFunction {
             f1,
             f2,
             var,
@@ -310,56 +306,56 @@ impl SumFunction {
     }
 }
 
-impl Function for SumFunction {
+impl<T1 : Function + ?Sized, T2 : Function + ?Sized> Function for SumFunction<T1, T2> {
     fn var() -> Var {
         self.var
     }
-    fn var_units -> Units {
+    fn var_units() -> Units {
         self.var_units
     }
-    fn final_units -> Units {
+    fn final_units() -> Units {
         self.final_units
     }
     fn check(&self) -> Result<(), FunctionInternalError> {
-        if  f1.var_units   != self.var_units   || f2.var_units   != self.var_units   ||
-            f1.final_units != self.final_units || f2.final_units != self.final_units ||
-            f1.var         != self.var         || f2.var         != self.var {
+        if  self.f1.var_units   != self.var_units   || self.f2.var_units   != self.var_units   ||
+            self.f1.final_units != self.final_units || self.f2.final_units != self.final_units ||
+            self.f1.var         != self.var         || self.f2.var         != self.var {
             return Err(FunctionInternalError::UnitMismatch);
         }
         Ok(())
     }
-    fn check_recursive(&self) -> Result<(), FuncitonInternalError> {
+    fn check_recursive(&self) -> Result<(), FunctionInternalError> {
         self.f1.check()?;
         self.f2.check()?;
         self.check()
     }
     fn compile_unchecked(&self) -> Box<dyn Fn(f32) -> Result<f32,EvalFunctionError>> {
         let closure1 = self.f1.compile_unchecked();
-        let closure2 = self.f2.compile_unchecked()
-        move |x| {
-            closure1(x) + closure2(x)
-        }
+        let closure2 = self.f2.compile_unchecked();
+        Box::new(move |x| {
+            Ok(closure1(x)? + closure2(x)?)
+        })
     }
-    fn mult_const(&self, n : f32) -> Box<SumFunction> {
-        SumFunction {
+    fn mult_const(&self, n : f32) -> Box<SumFunction<T1,T2>> {
+        Box::new(SumFunction {
             var : self.var,
             var_units : self.var_units,
             final_units : self.final_units,
             f1 : self.f1.mult_const(n),
             f2 : self.f2.mult_const(n),
-        }
+        })
     }
 }
 
-impl Differentiable for SumFunction where self.f1 : Differentiable, self.f2 : Differentiable {
+impl<T1 : Function + ?Sized, T2 : Function + ?Sized> Differentiable for SumFunction<T1,T2> where T1 : Differentiable, T2 : Differentiable {
     fn differentiate(&self, respect : Var) -> Result<Box<dyn Function>, DiffrientiationError> {
         if respect == self.var {
             Ok(Box::new(SumFunction {
                 var : self.var,
                 var_units : self.var_units,
                 final_units : self.final_units,
-                f1 : self.f1.differentiate(),
-                f2 : self.f2.differentiate(),
+                f1 : self.f1.differentiate(respect)?,
+                f2 : self.f2.differentiate(respect)?,
             }))
         } else {
             Err(DiffrientiationError::ProhibitedRespect)
@@ -367,15 +363,15 @@ impl Differentiable for SumFunction where self.f1 : Differentiable, self.f2 : Di
     }    
 }    
 
-impl Integrable for SumFunction where self.f1 : Integrable, self.f2 : Integrable {
+impl<T1 : Function + ?Sized, T2 : Function + ?Sized> Integrable for SumFunction<T1,T2> where T1 : Integrable, T2 : Integrable {
     fn integrate_c(&self, respect : Var, c : f32) -> Result<Box<dyn Function>, IntegrationError> { //preferably the function that is easier to add c to should go in f2; use bigger/more complex function first
         if respect == self.var {
             Ok(Box::new(SumFunction {
                 var : self.var,
                 var_units : self.var_units,
                 final_units : self.final_units,
-                f1 : self.f1.integrate(),
-                f2 : self.f2.integrate_c(c),
+                f1 : self.f1.integrate(respect)?,
+                f2 : self.f2.integrate_c(respect, c)?,
             }))
         } else {
             Err(IntegrationError::ProhibitedRespect)
