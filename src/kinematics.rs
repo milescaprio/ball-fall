@@ -337,12 +337,14 @@ impl<T1 : Function + ?Sized, T2 : Function + ?Sized> Function for SumFunction<T1
         })
     }
     fn mult_const(&self, n : f32) -> Box<SumFunction<T1,T2>> {
+        let f1 = self.f1.mult_const(n);
+        let f2 = self.f2.mult_const(n);
         Box::new(SumFunction {
             var : self.var,
             var_units : self.var_units,
             final_units : self.final_units,
-            f1 : self.f1.mult_const(n),
-            f2 : self.f2.mult_const(n),
+            f1,
+            f2,
         })
     }
 }
