@@ -135,13 +135,10 @@ pub trait Function {
             Err(FunctionCompatibilityError::InvalidUnits)
         }    
     }
-    fn mult_const(&self, n : f32) -> Box<dyn Function>;
+
+    fn mult_const(&self, n : f32) -> Box<dyn CalcFunction>;
         //if your function is for some reason not able to handle coefficients, you can return a different type,
         //like a composite or product function type
-    // fn simplify(&mut self);
-    // fn simplification(&self) -> Self;
-    // fn simplify_units(&mut self);
-    // fn simplification_units(&self) -> Self;
 }    
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
@@ -156,16 +153,27 @@ enum KinematicsFunctions {
 //todo: make these checked/unchecked, forcing implementation of both checked and unchecked for odd functions
 //to figure out their own FullyUnintegrable/FullyUndifferentiable/UnknownResultFormat errors in the checked version or use make a PartialIntegrable for functions that are sometimes integrable and require an errored version
 
-pub trait Integrable {
-    fn integrate_c(&self, respect : Var, c : f32) -> Result<Box<dyn Function>, IntegrationError>;
-    fn integrate(&self, respect : Var) -> Result<Box<dyn Function>, IntegrationError> {
+pub trait IntegrationBehavior {
+    //A trait that specifies that the function has known integration behavior. Recommended to implement this trait to convenience other composite functions,
+    //as sometimes the integrals are propogated down. Even if it just returns an integration error it means it can be put into functions that require it
+    //in case they are possibly integrated
+    //Todo: make this more intuitive, to predict behavior of dyn Functions, only forcing integratability when needed
+    fn integrate_c(&self, respect : Var, c : f32) -> Result<Box<dyn CalcFunction>, IntegrationError>;
+    fn integrate(&self, respect : Var) -> Result<Box<dyn CalcFunction>, IntegrationError> {
         self.integrate_c(respect, 0.0)
     }
 }
 
-pub trait Differentiable {
-    fn differentiate(&self, respect : Var) -> Result<Box<dyn Function>, DiffrientiationError>;
+pub trait DifferentiationBehavior {
+    //A trait that specifies that the function has known diffrientiation behavior. Recommended to implement this trait to convenience other composite functions,
+    //as sometimes the derivatives are propogated down. Even if it just returns a differentiation error it means it can be put into functions that require it
+    //in case they are possibly differentiated
+    //Todo: make this more intuitive, to predict behavior of dyn Functions, only forcing differentiability when needed
+    fn differentiate(&self, respect : Var) -> Result<Box<dyn CalcFunction>, DiffrientiationError>;
 }
+
+pub trait CalcFunction : Function + IntegrationBehavior + DifferentiationBehavior {}
+impl<T> CalcFunction for T where T: Function + IntegrationBehavior + DifferentiationBehavior {}
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
@@ -248,19 +256,19 @@ impl Function for Polynomial {
             }    
             Ok(result)
         })    
-    }    
-    fn mult_const(&self, n : f32) -> Box<Polynomial> {
+    }
+    fn mult_const(&self, n : f32) -> Box<dyn CalcFunction> {
         let mut product : Vec<Monomial> = Vec::new();
         let mut ret = self.clone();
-        for monomial in &ret {
+        for monomial in &ret.expression {
             monomial.coefficient *= n;
         }    
-        ret
+        Box::new(ret)
     }
 }    
 
-impl Differentiable for Polynomial {
-    fn differentiate(&self, respect : Var) -> Result<Box<dyn Function>, DiffrientiationError> {
+impl DifferentiationBehavior for Polynomial {
+    fn differentiate(&self, respect : Var) -> Result<Box<dyn CalcFunction>, DiffrientiationError> {
         if respect == self.var {
             let mut derivative : Vec<Monomial> = Vec::new();
             for monomial in &self.expression {
@@ -275,14 +283,14 @@ impl Differentiable for Polynomial {
     }    
 }    
 
-impl Integrable for Polynomial {
-    fn integrate_c(&self, respect : Var, c : f32) -> Result<Box<dyn Function>, IntegrationError> {
+impl IntegrationBehavior for Polynomial {
+    fn integrate_c(&self, respect : Var, c : f32) -> Result<Box<dyn CalcFunction>, IntegrationError> {
         if respect == self.var {
             let mut integral : Vec<Monomial> = Vec::new();
             for monomial in &self.expression {
                 integral.push(Monomial::init(monomial.coefficient / (monomial.exponent + 1) as f32, monomial.units_coefficient, monomial.exponent + 1));
             }    
-            integral[0] += c;
+            integral[0].coefficient += c;
             Ok(Box::new(Polynomial::init(self.var, self.var_units, self.final_units * self.var_units, integral)))
         } else {
             Err(IntegrationError::ProhibitedRespect)
@@ -291,16 +299,16 @@ impl Integrable for Polynomial {
 }
 
 pub struct SumFunction {
-    f1 : Box<dyn Function>,
-    f2 : Box<dyn Function>,
+    f1 : Box<dyn CalcFunction>,
+    f2 : Box<dyn CalcFunction>,
     pub var : Var,
     pub var_units : Units,
     pub final_units : Units,
 }
 
 impl SumFunction {
-    pub fn init(var: Var, var_units : Units, final_units : Units, f1 : Box<dyn Function>, f2 : Box<dyn Function>) -> Self {
-        Polynomial {
+    pub fn init(var: Var, var_units : Units, final_units : Units, f1 : Box<dyn CalcFunction>, f2 : Box<dyn CalcFunction>) -> Self {
+        SumFunction {
             f1,
             f2,
             var,
@@ -311,55 +319,55 @@ impl SumFunction {
 }
 
 impl Function for SumFunction {
-    fn var() -> Var {
+    fn var(&self) -> Var {
         self.var
     }
-    fn var_units -> Units {
+    fn var_units(&self) -> Units {
         self.var_units
     }
-    fn final_units -> Units {
+    fn final_units(&self) -> Units {
         self.final_units
     }
     fn check(&self) -> Result<(), FunctionInternalError> {
-        if  f1.var_units   != self.var_units   || f2.var_units   != self.var_units   ||
-            f1.final_units != self.final_units || f2.final_units != self.final_units ||
-            f1.var         != self.var         || f2.var         != self.var {
+        if  self.f1.var_units()   != self.var_units   || self.f2.var_units()   != self.var_units   ||
+            self.f1.final_units() != self.final_units || self.f2.final_units() != self.final_units ||
+            self.f1.var()         != self.var         || self.f2.var()         != self.var {
             return Err(FunctionInternalError::UnitMismatch);
         }
         Ok(())
     }
-    fn check_recursive(&self) -> Result<(), FuncitonInternalError> {
+    fn check_recursive(&self) -> Result<(), FunctionInternalError> {
         self.f1.check()?;
         self.f2.check()?;
         self.check()
     }
     fn compile_unchecked(&self) -> Box<dyn Fn(f32) -> Result<f32,EvalFunctionError>> {
         let closure1 = self.f1.compile_unchecked();
-        let closure2 = self.f2.compile_unchecked()
-        move |x| {
-            closure1(x) + closure2(x)
-        }
+        let closure2 = self.f2.compile_unchecked();
+        Box::new(move |x| {
+            Ok(closure1(x)? + closure2(x)?)
+        })
     }
-    fn mult_const(&self, n : f32) -> Box<SumFunction> {
-        SumFunction {
+    fn mult_const(&self, n : f32) -> Box<dyn CalcFunction> {
+        Box::new(SumFunction {
             var : self.var,
             var_units : self.var_units,
             final_units : self.final_units,
             f1 : self.f1.mult_const(n),
             f2 : self.f2.mult_const(n),
-        }
+        })
     }
 }
 
-impl Differentiable for SumFunction where self.f1 : Differentiable, self.f2 : Differentiable {
-    fn differentiate(&self, respect : Var) -> Result<Box<dyn Function>, DiffrientiationError> {
+impl DifferentiationBehavior for SumFunction {
+    fn differentiate(&self, respect : Var) -> Result<Box<dyn CalcFunction>, DiffrientiationError> {
         if respect == self.var {
             Ok(Box::new(SumFunction {
                 var : self.var,
                 var_units : self.var_units,
                 final_units : self.final_units,
-                f1 : self.f1.differentiate(),
-                f2 : self.f2.differentiate(),
+                f1 : self.f1.differentiate(respect)?,
+                f2 : self.f2.differentiate(respect)?,
             }))
         } else {
             Err(DiffrientiationError::ProhibitedRespect)
@@ -367,15 +375,15 @@ impl Differentiable for SumFunction where self.f1 : Differentiable, self.f2 : Di
     }    
 }    
 
-impl Integrable for SumFunction where self.f1 : Integrable, self.f2 : Integrable {
-    fn integrate_c(&self, respect : Var, c : f32) -> Result<Box<dyn Function>, IntegrationError> { //preferably the function that is easier to add c to should go in f2; use bigger/more complex function first
+impl IntegrationBehavior for SumFunction {
+    fn integrate_c(&self, respect : Var, c : f32) -> Result<Box<dyn CalcFunction>, IntegrationError> { //preferably the function that is easier to add c to should go in f2; use bigger/more complex function first
         if respect == self.var {
             Ok(Box::new(SumFunction {
                 var : self.var,
                 var_units : self.var_units,
                 final_units : self.final_units,
-                f1 : self.f1.integrate(),
-                f2 : self.f2.integrate_c(c),
+                f1 : self.f1.integrate(respect)?,
+                f2 : self.f2.integrate_c(respect, c)?,
             }))
         } else {
             Err(IntegrationError::ProhibitedRespect)
