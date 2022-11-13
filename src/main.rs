@@ -1,5 +1,5 @@
 mod kinematics;
-// mod physics;
+mod physics;
 // mod gl;
 // mod balls;
 

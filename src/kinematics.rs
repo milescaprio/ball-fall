@@ -227,14 +227,19 @@ impl Function for Polynomial {
         let mut i = 0;
         for monomial in &self.expression {
             if monomial.units_coefficient * self.var_units().pow(monomial.exponent) != self.final_units {
+                dbg!(monomial.units_coefficient);
+                dbg!(self.var_units().pow(monomial.exponent));
+                dbg!(self.final_units);
                 return Err(FunctionInternalError::UnitMismatch);
             }    
             if monomial.exponent != i {
                 if monomial.exponent < 0 {
                     return Err(FunctionInternalError::SpecificFunctionError("NegativeExponent"));
                 }
+                dbg!(self);
                 return Err(FunctionInternalError::SpecificFunctionError("UnsortedPolynomial"))
             }
+            i += 1;
         }    
         Ok(())
     }
@@ -260,7 +265,7 @@ impl Function for Polynomial {
     fn mult_const(&self, n : f32) -> Box<dyn CalcFunction> {
         let mut product : Vec<Monomial> = Vec::new();
         let mut ret = self.clone();
-        for monomial in &ret.expression {
+        for monomial in &mut ret.expression {
             monomial.coefficient *= n;
         }    
         Box::new(ret)
@@ -287,10 +292,10 @@ impl IntegrationBehavior for Polynomial {
     fn integrate_c(&self, respect : Var, c : f32) -> Result<Box<dyn CalcFunction>, IntegrationError> {
         if respect == self.var {
             let mut integral : Vec<Monomial> = Vec::new();
+            integral.push(Monomial { coefficient: c, units_coefficient: self.final_units * self.var_units, exponent: 0 });
             for monomial in &self.expression {
                 integral.push(Monomial::init(monomial.coefficient / (monomial.exponent + 1) as f32, monomial.units_coefficient, monomial.exponent + 1));
-            }    
-            integral[0].coefficient += c;
+            }
             Ok(Box::new(Polynomial::init(self.var, self.var_units, self.final_units * self.var_units, integral)))
         } else {
             Err(IntegrationError::ProhibitedRespect)
@@ -434,7 +439,7 @@ mod tests {
         let none = Units::empty();
         let slope = Monomial::init(2.0, none, 1);
         let intercept = Monomial::init(3.0, meters, 0);
-        let polynomial = Polynomial::init(Var::X, meters, meters, vec![slope, intercept]);
+        let polynomial = Polynomial::init(Var::X, meters, meters, vec![intercept, slope]);
         assert_eq!(polynomial.compile().unwrap()(1.0).unwrap(), 5.0);
     }
     #[test]
@@ -445,7 +450,7 @@ mod tests {
         let none = Units::empty();
         let slope = Monomial::init(2.0, none, 1);
         let intercept = Monomial::init(3.0, meters, 0);
-        let polynomial = Polynomial::init(Var::X, meters, meters, vec![slope, intercept]);
+        let polynomial = Polynomial::init(Var::X, meters, meters, vec![intercept, slope]);
         assert_eq!(polynomial.compile().unwrap()(1.0).unwrap(), 1.0);
     }
     #[test]
@@ -455,7 +460,7 @@ mod tests {
         let none = Units::empty();
         let slope = Monomial::init(2.0, none, 1);
         let intercept = Monomial::init(3.0, meters, 0);
-        let polynomial = Polynomial::init(Var::X, meters, meters, vec![slope, intercept]);
+        let polynomial = Polynomial::init(Var::X, meters, meters, vec![intercept, slope]);
         let derivative = polynomial.differentiate(Var::X).unwrap();
         assert_eq!(derivative.compile().unwrap()(1.0).unwrap(), 2.0);
     }
@@ -466,7 +471,7 @@ mod tests {
         let none = Units::empty();
         let slope = Monomial::init(2.0, none, 1);
         let intercept = Monomial::init(3.0, meters, 0);
-        let polynomial = Polynomial::init(Var::X, meters, meters, vec![slope, intercept]);
+        let polynomial = Polynomial::init(Var::X, meters, meters, vec![intercept, slope]);
         let integral = polynomial.integrate_c(Var::X, 0.0).unwrap();
         assert_eq!(integral.compile().unwrap()(1.0).unwrap(), 4.0);
     }
