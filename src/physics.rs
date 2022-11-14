@@ -1,9 +1,24 @@
 use super::kinematics;
 use kinematics::Function;
+use kinematics::CalcFunction;
 use kinematics::SumFunction;
 use kinematics::Unit;
 use kinematics::Units;
 const GRAVITY_MPS2: f32 = -9.81;
+
+struct FunctionCache {
+    pub closure: fn(f32) -> f32,
+}
+
+impl Default for FunctionCache {
+    fn default() -> Self {
+        Self {
+            closure: |x| x,
+        }
+    }
+}
+
+
 
 #[derive(Default)]
 struct Ball {
@@ -11,8 +26,8 @@ struct Ball {
     y: f32,
     radius: f32,
     mass: f32,
-    fx: fn(f32) -> f32, //respect to time
-    fy: fn(f32) -> f32,
+    fx: FunctionCache, //respect to time
+    fy: FunctionCache,
     cached_x_Function : Box<dyn Function>,
     cached_y_Function : Box<dyn Function>,
 }

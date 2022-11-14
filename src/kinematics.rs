@@ -136,9 +136,10 @@ pub trait Function {
         }    
     }
 
-    fn mult_const(&self, n : f32) -> Box<dyn CalcFunction>;
+    fn mult_const(&self, n : f32) -> Self;
         //if your function is for some reason not able to handle coefficients, you can return a different type,
         //like a composite or product function type
+    fn stereotype() -> Self;
 }    
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
@@ -262,13 +263,16 @@ impl Function for Polynomial {
             Ok(result)
         })    
     }
-    fn mult_const(&self, n : f32) -> Box<dyn CalcFunction> {
+    fn mult_const(&self, n : f32) -> Self {
         let mut product : Vec<Monomial> = Vec::new();
         let mut ret = self.clone();
         for monomial in &mut ret.expression {
             monomial.coefficient *= n;
         }    
         Box::new(ret)
+    }
+    fn stereotype() -> Self {
+        Box::new(Polynomial::init(Var::X, Units::M, Units::M, vec![Monomial::init(1.0, Units::M, 1)]))
     }
 }    
 
