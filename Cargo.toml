@@ -6,7 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bufro = "0.2.7"
+#bufro = "0.2.7"
 #x11 = "2.20.0"
 #xlib = "0.0.3"
-rand = "0.8.4"
+#rand = "0.8.4"
+piston = "0.36.0"
+piston2d-graphics = "0.26.0"
+pistoncore-glutin_window = "0.45.0"
+piston2d-opengl_graphics = "0.52.0"
