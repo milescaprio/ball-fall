@@ -18,19 +18,39 @@ use piston::event_loop::{EventSettings, Events};
 use piston::input::{RenderArgs, RenderEvent, UpdateArgs, UpdateEvent};
 use piston::window::WindowSettings;
 
+static opengl : OpenGL = OpenGL::V4_0;
+
 pub struct Window {
     width : usize,
     height : usize,
     gl : GlGraphics,
+    window : GlutinWindow,
+    events : Events,
 }
 
 impl Window {
     pub fn new(width : usize, height : usize) -> Window {
-        let opengl : OpenGL = OpenGL::V4_0;
+        let mut events = Events::new(EventSettings::new());
+        let mut window: GlutinWindow = WindowSettings::new(
+            "Test Window!",
+            [width, height]
+        ).opengl(opengl)
+            .exit_on_esc(true)
+            .build()
+            .unwrap();
         Window {
             width,
             height,
             gl : GlGraphics::new(opengl),
+            window,
+            events,
+        }
+    }
+    pub fn maintain(&mut self) {
+        while let Some(e) = events.next(&mut window) {
+            if let Some(r) = e.render_args() {
+                myWindow.render(&r);
+            }
         }
     }
     pub fn render(&mut self, args : &RenderArgs) {
@@ -47,24 +67,9 @@ mod tests {
     use super::*;
     #[test]
     fn it_works() {
-        let opengl : OpenGL = OpenGL::V4_0;
-        let mut window: GlutinWindow = WindowSettings::new(
-            "Test Window!",
-            [200, 200]
-        ).opengl(opengl)
-            .exit_on_esc(true)
-            .build()
-            .unwrap();
-        let mut myWindow = Window {
-            width : 800,
-            height : 600,
-            gl : GlGraphics::new(opengl),
-        };
-        let mut events = Events::new(EventSettings::new());
-        while let Some(e) = events.next(&mut window) {
-            if let Some(r) = e.render_args() {
-                myWindow.render(&r);
-            }
+        let mut myWindow = Window::new(800,600);
+        loop {
+            myWindow
         }
     }
 }
