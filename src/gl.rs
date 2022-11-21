@@ -1,12 +1,3 @@
-// use bufro::Color;
-// use cgmath::VectorSpace;
-// use winit::{
-//     event::*,
-//     event_loop::{ControlFlow, EventLoop},
-//     window::WindowBuilder,
-// };
-// use std::time::Instant;
-// use rand::RngCore;
 extern crate glutin_window;
 extern crate graphics;
 extern crate opengl_graphics;
@@ -27,7 +18,7 @@ pub struct Window {
     height : usize,
     gl : GlGraphics,
     window : Option<GlutinWindow>,
-    events : Events,
+    events : Option<Events>,
     rtick : u64,
     utick : u64,
     renderf : Option<Box<dyn FnMut(u64, u64, graphics::Context, &mut GlGraphics)>>,
@@ -48,7 +39,6 @@ impl Window {
 
     pub fn new(width : usize, height : usize) -> Window {
         //Create a new window
-        let mut events = Events::new(EventSettings::new());
         //events.set_max_fps(165);
         //events.set_lazy(true);
         Self {
@@ -56,7 +46,7 @@ impl Window {
             height,
             gl : GlGraphics::new(OPENGL_VER),
             window : None,
-            events,
+            None,
             rtick : 0,
             utick : 0,
             renderf : None,
@@ -64,7 +54,7 @@ impl Window {
         }
     }
     pub fn begin(&mut self, title : String, FLAGS : u32) {
-        self.window = WindowSettings::new(
+        self.window = Some(WindowSettings::new(
             "",
             [self.width as u32, self.height as u32],
         ).opengl(OPENGL_VER)
@@ -76,7 +66,9 @@ impl Window {
             .decorated(FLAGS | Self::DECORATED != 0)
             .controllers(FLAGS | Self::CONTROLLERS != 0)
             .srgb(FLAGS | Self::SRGB != 0)
-            .build().unwrap();
+            .build().unwrap());
+        self.events = Some(Events::new(EventSettings::new())
+        );
     }   
     pub fn init(width : usize, height : usize, renderf : RenderFunction, updatef : UpdateFunction) -> Window {
         let mut ret = Window::new(width, height);
@@ -86,13 +78,11 @@ impl Window {
     }
     pub fn maintain(&mut self) {
         while let Some(e) = self.events.next(&mut self.window.unwrap_or_else(|| panic!("Window not initialized!"))) {
-            //dbg!(&e);
             if let Some(r) = e.render_args() {
                 self.render(&r);
             }
             if let Some(u) = e.update_args() {
                 self.update(&u);
-                //println!("Update tick: {}", self.utick);
             }
         }
     }
@@ -128,7 +118,7 @@ impl Default for Window {
             const COOL_COLOR2 : [f32; 4] = [0.35, 0.15, 0.87, 1.0];
             // if self.tick != 0 {
             graphics::clear(COOL_COLOR, gl);
-            let mut rect = graphics::rectangle::square(0.0, 0.0, ((rtick + utick) % 1024) as f64);
+            let rect = graphics::rectangle::square(0.0, 0.0, ((rtick + utick) % 1024) as f64);
             graphics::rectangle(COOL_COLOR2, rect, c.transform, gl)
             // }
         };
