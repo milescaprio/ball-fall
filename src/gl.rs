@@ -21,10 +21,14 @@ pub struct Window {
     events : Option<Events>,
     rtick : u64,
     utick : u64,
+    ups : u64,
+    fps : u64,
     renderf : Option<Box<dyn FnMut(u64, u64, graphics::Context, &mut GlGraphics)>>,
     updatef : Option<Box<dyn FnMut(u64)>>,
 }
-
+fn print_type_of<T>(_: &T) {
+    println!("{}", std::any::type_name::<T>())
+}
 impl Window {
     
     const FLAGLESS : u32 = 0;
@@ -35,6 +39,7 @@ impl Window {
     const FULLSCREEN : u32 = 0x16;
     const SRGB : u32 = 0x32;
     const CONTROLLERS : u32 = 0x64;
+    const LAZY : u32 = 0x128;
     const DEFAULT_FLAGS : u32 = Self::EXIT_ON_ESC | Self::RESIZABLE | Self::VSYNC | Self::DECORATED;
 
     pub fn new(width : usize, height : usize) -> Window {
@@ -46,14 +51,18 @@ impl Window {
             height,
             gl : GlGraphics::new(OPENGL_VER),
             window : None,
-            None,
+            events : None,
             rtick : 0,
             utick : 0,
+            ups : 0,
+            fps : 0,
             renderf : None,
             updatef : None,
         }
     }
     pub fn begin(&mut self, title : String, FLAGS : u32) {
+        //Begin the window by moving the cache to a active window on the screen
+        //renderf and updatef should be set for the window's behavior
         self.window = Some(WindowSettings::new(
             "",
             [self.width as u32, self.height as u32],
@@ -67,9 +76,15 @@ impl Window {
             .controllers(FLAGS | Self::CONTROLLERS != 0)
             .srgb(FLAGS | Self::SRGB != 0)
             .build().unwrap());
-        self.events = Some(Events::new(EventSettings::new())
-        );
+        self.events = Some(Events::new(EventSettings::new()
+            .lazy(FLAGS | Self::LAZY != 0)
+        ));
+        self.set_ups(self.ups);
+        self.set_fps(self.fps);
     }   
+    // pub fn edit(&mut self, title : String, FLAGS : u32) {
+    //     //Update the window flags 
+    // }
     pub fn init(width : usize, height : usize, renderf : RenderFunction, updatef : UpdateFunction) -> Window {
         let mut ret = Window::new(width, height);
         ret.renderf = Some(renderf);
@@ -77,17 +92,28 @@ impl Window {
         ret
     }
     pub fn maintain(&mut self) {
-        while let Some(e) = self.events.next(&mut self.window.unwrap_or_else(|| panic!("Window not initialized!"))) {
-            if let Some(r) = e.render_args() {
-                self.render(&r);
-            }
-            if let Some(u) = e.update_args() {
-                self.update(&u);
-            }
+        if self.window.is_none() {
+            return;
         }
+        print_type_of(&mut self.window.as_ref().unwrap_or_else(|| panic!("Window not initialized!")))
+        // while let Some(e) = self.events.as_ref().unwrap().next() {
+        //     if let Some(r) = e.render_args() {
+        //         self.render(&r);
+        //     }
+        //     if let Some(u) = e.update_args() {
+        //         self.update(&u);
+        //     }
+        // }
     }
-    pub fn set_ups(&mut self, new_ups : u64) {
-        self.events.set_ups(new_ups);
+    pub fn set_ups(&mut self, new_ups : u64) -> Option<()>{
+        self.ups = new_ups;
+        self.events?.set_ups(new_ups);
+        Some(())
+    }
+    pub fn set_fps(&mut self, new_fps : u64) -> Option<()>{
+        self.fps = new_fps;
+        self.events?.set_max_fps(new_fps);
+        Some(())
     }
     pub fn render(&mut self, args : &RenderArgs) {
         use graphics;
@@ -134,10 +160,11 @@ mod tests {
     use super::*;
     #[test]
     fn it_works() {
-        let mut my_window = Window::default();
-        my_window.begin("Yeet".to_string(), Window::DEFAULT_FLAGS);
-        loop {
-            my_window.maintain();
-        }
+        let mut my_window = Window::new(3,3);
+        // let mut my_window = Window::default();
+        // my_window.begin("Yeet".to_string(), Window::DEFAULT_FLAGS);
+        // loop {
+        //     my_window.maintain();
+        // }
     }
 }
