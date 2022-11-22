@@ -16,13 +16,11 @@ static OPENGL_VER : OpenGL = OpenGL::V4_0;
 pub struct Window {
     width : usize,
     height : usize,
-    gl : GlGraphics,
+    gl : Option<GlGraphics>,
     window : Option<GlutinWindow>,
-    events : Option<Events>,
+    events : Events,
     rtick : u64,
     utick : u64,
-    ups : u64,
-    fps : u64,
     renderf : Option<Box<dyn FnMut(u64, u64, graphics::Context, &mut GlGraphics)>>,
     updatef : Option<Box<dyn FnMut(u64)>>,
 }
@@ -49,13 +47,11 @@ impl Window {
         Self {
             width,
             height,
-            gl : GlGraphics::new(OPENGL_VER),
+            gl : None,
             window : None,
-            events : None,
+            events : Events::new(EventSettings::new()),
             rtick : 0,
             utick : 0,
-            ups : 0,
-            fps : 0,
             renderf : None,
             updatef : None,
         }
@@ -67,20 +63,18 @@ impl Window {
             "",
             [self.width as u32, self.height as u32],
         ).opengl(OPENGL_VER)
-            .resizable(FLAGS | Self::RESIZABLE != 0)
-            .exit_on_esc(FLAGS | Self::EXIT_ON_ESC != 0)
-            .vsync(FLAGS | Self::VSYNC != 0)
+            .resizable(FLAGS & Self::RESIZABLE != 0)
+            .exit_on_esc(FLAGS & Self::EXIT_ON_ESC != 0)
+            .vsync(FLAGS & Self::VSYNC != 0)
             .title(title)
-            .fullscreen(FLAGS | Self::FULLSCREEN != 0)
-            .decorated(FLAGS | Self::DECORATED != 0)
-            .controllers(FLAGS | Self::CONTROLLERS != 0)
-            .srgb(FLAGS | Self::SRGB != 0)
+            .fullscreen(FLAGS & Self::FULLSCREEN != 0)
+            .decorated(FLAGS & Self::DECORATED != 0)
+            .controllers(FLAGS & Self::CONTROLLERS != 0)
+            .srgb(FLAGS & Self::SRGB != 0)
             .build().unwrap());
-        self.events = Some(Events::new(EventSettings::new()
-            .lazy(FLAGS | Self::LAZY != 0)
-        ));
-        self.set_ups(self.ups);
-        self.set_fps(self.fps);
+        self.events = self.events
+            .lazy(FLAGS | Self::LAZY != 0);
+        self.gl = Some(GlGraphics::new(OPENGL_VER));
     }   
     // pub fn edit(&mut self, title : String, FLAGS : u32) {
     //     //Update the window flags 
@@ -95,7 +89,7 @@ impl Window {
         if self.window.is_none() {
             return;
         }
-        print_type_of(&mut self.window.as_ref().unwrap_or_else(|| panic!("Window not initialized!")))
+        print_type_of(&mut self.window)
         // while let Some(e) = self.events.as_ref().unwrap().next() {
         //     if let Some(r) = e.render_args() {
         //         self.render(&r);
@@ -106,19 +100,17 @@ impl Window {
         // }
     }
     pub fn set_ups(&mut self, new_ups : u64) -> Option<()>{
-        self.ups = new_ups;
-        self.events?.set_ups(new_ups);
+        self.events.set_ups(new_ups);
         Some(())
     }
     pub fn set_fps(&mut self, new_fps : u64) -> Option<()>{
-        self.fps = new_fps;
-        self.events?.set_max_fps(new_fps);
+        self.events.set_max_fps(new_fps);
         Some(())
     }
     pub fn render(&mut self, args : &RenderArgs) {
         use graphics;
         if let Some(f) = &mut self.renderf {
-            self.gl.draw(args.viewport(), |c, gl| {f(self.rtick, self.utick, c, gl)});
+            self.gl.as_mut().expect("Window Not Initialized").draw(args.viewport(), |c, gl| {f(self.rtick, self.utick, c, gl)});
         }
         self.rtick += 1;
     }
@@ -151,7 +143,7 @@ impl Default for Window {
         let updatef = |utick : u64|{
             
         };
-        Self::init(1024, 768, Box::new(renderf), Box::new(updatef))
+        Self::init(640, 480, Box::new(renderf), Box::new(updatef))
     }
 }
 
@@ -160,11 +152,11 @@ mod tests {
     use super::*;
     #[test]
     fn it_works() {
-        let mut my_window = Window::new(3,3);
-        // let mut my_window = Window::default();
-        // my_window.begin("Yeet".to_string(), Window::DEFAULT_FLAGS);
-        // loop {
-        //     my_window.maintain();
-        // }
+        //let mut my_window = Window::new(3,3);
+        let mut my_window = Window::default();
+        my_window.begin("Yeet".to_string(), Window::DEFAULT_FLAGS);
+        loop {
+            my_window.maintain();
+        }
     }
 }
