@@ -1,6 +1,6 @@
-//mod kinematics;
-//mod physics;
-mod gl;
+mod kinematics;
+mod physics;
+//mod gl;
 //mod balls;
 
 fn main() {

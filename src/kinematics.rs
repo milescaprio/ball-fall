@@ -136,17 +136,17 @@ pub trait Function {
         }    
     }
 
-    fn mult_const(&self, n : f32) -> Self;
+    fn mult_const(&self, n : f32) -> Box<dyn Function>;
         //if your function is for some reason not able to handle coefficients, you can return a different type,
         //like a composite or product function type
-    fn stereotype() -> Self;
+    fn stereotype() -> Self where Self : Sized; //can only be called on a variant of Function not just a dyn Function type
 }    
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
 enum KinematicsFunctions {
     Polynomial(Polynomial),
-    SumFunction(SumFunction),
+    SumCalcFunction(SumCalcFunction),
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
@@ -263,7 +263,7 @@ impl Function for Polynomial {
             Ok(result)
         })    
     }
-    fn mult_const(&self, n : f32) -> Self {
+    fn mult_const(&self, n : f32) -> Box<dyn Function> {
         let mut product : Vec<Monomial> = Vec::new();
         let mut ret = self.clone();
         for monomial in &mut ret.expression {
@@ -271,7 +271,7 @@ impl Function for Polynomial {
         }    
         Box::new(ret)
     }
-    fn stereotype() -> Self {
+    fn stereotype() -> Box<dyn Function> {
         Box::new(Polynomial::init(Var::X, Units::M, Units::M, vec![Monomial::init(1.0, Units::M, 1)]))
     }
 }    
@@ -307,7 +307,7 @@ impl IntegrationBehavior for Polynomial {
     }    
 }
 
-pub struct SumFunction {
+pub struct SumCalcFunction {
     f1 : Box<dyn CalcFunction>,
     f2 : Box<dyn CalcFunction>,
     pub var : Var,
@@ -315,9 +315,9 @@ pub struct SumFunction {
     pub final_units : Units,
 }
 
-impl SumFunction {
+impl SumCalcFunction {
     pub fn init(var: Var, var_units : Units, final_units : Units, f1 : Box<dyn CalcFunction>, f2 : Box<dyn CalcFunction>) -> Self {
-        SumFunction {
+        SumCalcFunction {
             f1,
             f2,
             var,
@@ -327,7 +327,7 @@ impl SumFunction {
     }
 }
 
-impl Function for SumFunction {
+impl Function for SumCalcFunction {
     fn var(&self) -> Var {
         self.var
     }
@@ -358,7 +358,7 @@ impl Function for SumFunction {
         })
     }
     fn mult_const(&self, n : f32) -> Box<dyn CalcFunction> {
-        Box::new(SumFunction {
+        Box::new(SumCalcFunction {
             var : self.var,
             var_units : self.var_units,
             final_units : self.final_units,
@@ -368,10 +368,10 @@ impl Function for SumFunction {
     }
 }
 
-impl DifferentiationBehavior for SumFunction {
+impl DifferentiationBehavior for SumCalcFunction {
     fn differentiate(&self, respect : Var) -> Result<Box<dyn CalcFunction>, DiffrientiationError> {
         if respect == self.var {
-            Ok(Box::new(SumFunction {
+            Ok(Box::new(SumCalcFunction {
                 var : self.var,
                 var_units : self.var_units,
                 final_units : self.final_units,
@@ -384,10 +384,10 @@ impl DifferentiationBehavior for SumFunction {
     }    
 }    
 
-impl IntegrationBehavior for SumFunction {
+impl IntegrationBehavior for SumCalcFunction {
     fn integrate_c(&self, respect : Var, c : f32) -> Result<Box<dyn CalcFunction>, IntegrationError> { //preferably the function that is easier to add c to should go in f2; use bigger/more complex function first
         if respect == self.var {
-            Ok(Box::new(SumFunction {
+            Ok(Box::new(SumCalcFunction {
                 var : self.var,
                 var_units : self.var_units,
                 final_units : self.final_units,
