@@ -2,8 +2,10 @@ use super::kinematics;
 use kinematics::Function;
 use kinematics::CalcFunction;
 use kinematics::SumCalcFunction;
+use kinematics::Polynomial;
 use kinematics::Unit;
 use kinematics::Units;
+use kinematics::Var;
 const GRAVITY_MPS2: f32 = -9.81;
 
 struct FunctionCache {
@@ -18,7 +20,13 @@ impl Default for FunctionCache {
     }
 }
 
-
+impl FunctionCache {
+    pub fn new(closure: fn(f32) -> f32) -> Self {
+        Self {
+            closure,
+        }
+    }
+}
 
 #[derive(Default)]
 struct Ball {
@@ -62,8 +70,8 @@ impl Angle {
 }
 
 enum AccelxyFunction {
-    ParterFunctionVector(Box<dyn Function>, Angle),
-    IndependentFunctions(Box<dyn Function>, Box<dyn Function>),
+    ParterFunctionVector(Box<dyn CalcFunction>, Angle),
+    IndependentFunctions(Box<dyn CalcFunction>, Box<dyn CalcFunction>),
     CompositeAcceleration(Box<AccelxyFunction>, Box<AccelxyFunction>),
 }
 
@@ -71,70 +79,75 @@ impl Ball {
     pub fn soft_update_unchecked(&mut self) { 
         //use when data hasnt been recently injected and checking isn't worth
         //not checking won't result in unsafe code but could create odd function behavior
-        fx = self.cached_x_Function.as_ref().expect("No cache, unable to soft update!").compile_unchecked();
-        fy = self.cached_y_Function.as_ref().expect("No cache, unable to soft update!").compile_unchecked();
-        self.x = x;
-        self.y = y;
+        self.fx = FunctionCache::new(self.cached_x_Function.as_ref().expect("No cache, unable to soft update!").compile_unchecked());
+        self.fy = FunctionCache::new(self.cached_y_Function.as_ref().expect("No cache, unable to soft update!").compile_unchecked());
+        // self.x = x;
+        // self.y = y;
     }
-    pub fn soft_update(&mut self) -> Result<(), FunctionInternalError> {
-        fx = self.cached_x_Function.as_ref().expect("No cache, unable to soft update!").compile()?;
-        fy = self.cached_y_Function.as_ref().expect("No cache, unable to soft update!").compile()?;
-        self.x = x;
-        self.y = y;
+    pub fn soft_update(&mut self) -> Result<(), kinematics::FunctionInternalError> {
+        self.fx = FunctionCache::new(self.cached_x_Function.as_ref().expect("No cache, unable to soft update!").compile()?);
+        self.fy = FunctionCache::new(self.cached_y_Function.as_ref().expect("No cache, unable to soft update!").compile()?);
+        Ok(())
+        // self.x = x;
+        // self.y = y;
     }
-    pub fn hard_update_unchecked(&mut self, a_ref : &AccelxyFunction) {
+    fn recurhelper_hard_update_unchecked(&self, a_ref : &AccelxyFunction) -> (Box<dyn CalcFunction>, Box<dyn CalcFunction>) {
         if let AccelxyFunction::ParterFunctionVector(a, d) = a_ref {
-            let cached_d_Function = a .integrate().unwrap().integrate().unwrap();
-            self.cached_x_Function = Some(cached_d_Function.mult_const(d.xy_h(1).0));
-            self.cached_y_Function = Some(cached_d_Function.mult_const(d.xy_h(1).1));
-            self.soft_update_unchecked();
-        }
-        else if let AccelxyFunction::IndependentFunctions(ax, ay) = a_ref {
-            self.cached_x_Function = ax.integrate().unwrap().integrate().unwrap();
-            self.cached_y_Function = ay.integrate().unwrap().integrate().unwrap();
-            self.soft_update_unchecked();
-        } else if let AccelxyFunction::CompositeAcceleration(a1, a2) = a_ref {
-            //we have two accelerations and need to integrate each parts individually, both xnet and ynet
-            //we calculate x and y from a1 and x and y from a2 recursively then throw them into a self.cached_x_Function and self.cached_y_Function
-            xy1 = self.recurhelper_hard_update_unchecked(a1);
-            xy2 = self.recurhelper_hard_update_unchecked(a2);
-            self.cached_x_Function = Some(Box::new(kinematics::SumCalcFunction(xy1.0,xy2.0)));
-            self.cached_y_Function = Some(Box::new(kinematics::SumCalcFunction(xy1.1,xy2.1)));
-            self.soft_update_unchecked();
-        }
-    }
-    fn recurhelper_hard_update_unchecked(&self, a_ref : &AccelxyFunction) -> (Box<dyn Function>, Box<dyn Function>) {
-        if let AccelxyFunction::ParterFunctionVector(a, d) = a_ref {
-            let cached_d_Function = a .integrate().unwrap().integrate().unwrap();
+            let cached_d_Function = a .integrate(Var::S).unwrap().integrate(Var::S).unwrap();
             return (
-                cached_d_Function.mult_const(d.xy_h(1).0),
-                cached_d_Function.mult_const(d.xy_h(1).1)
+                cached_d_Function.mult_const(d.xy_h(1.).0),
+                cached_d_Function.mult_const(d.xy_h(1.).1)
             );
         }
         else if let AccelxyFunction::IndependentFunctions(ax, ay) = a_ref {
             return (
-                ax.integrate().unwrap().integrate().unwrap(),
-                ay.integrate().unwrap().integrate().unwrap()
+                ax.integrate(Var::X).unwrap().integrate(Var::X).unwrap(),
+                ay.integrate(Var::Y).unwrap().integrate(Var::Y).unwrap()
             );
         }
-        else if let AccelxyFunction::CompositeAcceleration(a1, a2) = self.a {
-            xy1 = self.recurhelper_hard_update_unchecked(&a1);
-            xy2 = self.recurhelper_hard_update_unchecked(&a2);
+        else if let AccelxyFunction::CompositeAcceleration(a1, a2) = a_ref {
+            let xy1 = self.recurhelper_hard_update_unchecked(&a1);
+            let xy2 = self.recurhelper_hard_update_unchecked(&a2);
             (
-                kinematics::SumCalcFunction(xy1.0,xy2.0),
-                kinematics::SumCalcFunction(xy1.1,xy2.1)
+                Box::new(SumCalcFunction::from_compatible(xy1.0,xy2.0).unwrap()),
+                Box::new(SumCalcFunction::from_compatible(xy1.1,xy2.1).unwrap()),
             )
         }
+    }
+    pub fn hard_update_unchecked(&mut self, a_ref : &AccelxyFunction) {
+        use AccelxyFunction::*;
+        match a_ref {
+            ParterFunctionVector(a, d) => {
+                let cached_d_Function = a .integrate(Var::X).unwrap().integrate(Var::Y).unwrap();
+                self.cached_x_Function = Some(cached_d_Function.mult_const(d.xy_h(1.0).0));
+                self.cached_y_Function = Some(cached_d_Function.mult_const(d.xy_h(1.0).1));
+                self.soft_update_unchecked();
+            }
+            IndependentFunctions(ax, ay) => {
+                self.cached_x_Function = Some(ax.integrate(Var::X).unwrap().integrate(Var::X).unwrap());
+                self.cached_y_Function = Some(ay.integrate(Var::Y).unwrap().integrate(Var::Y).unwrap());
+                self.soft_update_unchecked();
+            }
+            CompositeAcceleration(a1, a2) => {
+                //we have two accelerations and need to integrate each parts individually, both xnet and ynet
+                //we calculate x and y from a1 and x and y from a2 recursively then throw them into a self.cached_x_Function and self.cached_y_Function
+                let xy1 = self.recurhelper_hard_update_unchecked(a1);
+                let xy2 = self.recurhelper_hard_update_unchecked(a2);
+                self.cached_x_Function = Some(Box::new(SumCalcFunction::from_compatible(xy1.0,xy2.0).unwrap()));
+                self.cached_y_Function = Some(Box::new(SumCalcFunction::from_compatible(xy1.1,xy2.1).unwrap()));
+                self.soft_update_unchecked();
+            }
     }
 }
 
 impl Space {
     fn blank(a : AccelxyFunction) -> Space {
         Space {
-            x1 : -10,
-            x2 : 10,
-            y1 : -10,
-            y2 : 10,
+            x1 : -10.0,
+            x2 : 10.0,
+            y1 : -10.0,
+            y2 : 10.0,
+            floor : 0.0,
             time_units : Unit::S.units(),
             space_units : Unit::M.units(),
             mass_units : Unit::KG.units(),
@@ -167,10 +180,34 @@ impl Space {
 
 #[cfg(test)]
 mod tests {
+    use crate::kinematics::Monomial;
+
     use super::*;
     #[test]
     fn gravity_space() {
-        let mut myspace : Space = Space::blank(AccelxyFunction::IndependentFunctions(Box::new(kinematics::ConstantFunction(0.0)), Box::new(kinematics::ConstantFunction(GRAVITY_MPS2))));
+        let mps2 : Units = Unit::M.units() / Unit::S.units() / Unit::S.units();
+        let noaccel = Monomial::init(0.0, mps2, 0);
+        let g = Monomial::init(GRAVITY_MPS2, mps2, 0);
+        let mut myspace = Space::blank(
+            AccelxyFunction::IndependentFunctions(
+                Box::new(
+                    Polynomial::init(
+                        Var::T,
+                        Unit::S.units(),
+                        mps2, 
+                        vec![noaccel]
+                    )
+                ), 
+                Box::new(
+                    Polynomial::init(
+                        Var::T,
+                        Unit::S.units(),
+                        mps2, 
+                        vec![g]
+                    )
+                )
+            )
+        ); 
         myspace.new_ball_unchecked(0.0, 0.0, 1.0, 1.0);
         myspace.tick(1.0);
     }

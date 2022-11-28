@@ -8,6 +8,7 @@ pub enum Var {
     T,
     X,
     Y,
+    S, //undirectional position
 }
 
 const UniqueUnits : usize = 3;
@@ -117,6 +118,7 @@ pub trait Function {
     fn var_units(&self) -> Units;
     fn final_units(&self) -> Units;
     fn var(&self) -> Var;
+    //todo: add resulting var?
     fn check(&self) -> Result<(),FunctionInternalError>;
     fn check_recursive(&self) -> Result<(), FunctionInternalError>;
     fn compile(&self) -> Result<Box<dyn Fn(f32) -> Result<f32,EvalFunctionError>>, FunctionInternalError> {
@@ -277,6 +279,7 @@ impl Function for Polynomial {
 }    
 
 impl DifferentiationBehavior for Polynomial {
+    fn mult_const_calc(&self, n : f32) -> Box<dyn CalcFunction>; //this is a dumb solution, everything sorta fell apart with the CalcFunction, but I have nothing better right now
     fn differentiate(&self, respect : Var) -> Result<Box<dyn CalcFunction>, DiffrientiationError> {
         if respect == self.var {
             let mut derivative : Vec<Monomial> = Vec::new();
@@ -316,14 +319,23 @@ pub struct SumCalcFunction {
 }
 
 impl SumCalcFunction {
-    pub fn init(var: Var, var_units : Units, final_units : Units, f1 : Box<dyn CalcFunction>, f2 : Box<dyn CalcFunction>) -> Self {
-        SumCalcFunction {
+    pub fn from_compatible(f1 : Box<dyn CalcFunction>, f2 : Box<dyn CalcFunction>) -> Result<Self,&'static str> {
+        if f1.var() != f2.var() {
+            return Err("Functions Contain Different Input Variables");
+        }
+        if f1.var_units() != f2.var_units() {
+            return Err("Functions Contain Different Input Variable Units");
+        }
+        if f1.final_units() != f2.final_units() {
+            return Err("Functions Contain Different Output Units");
+        }
+        Ok(SumCalcFunction {
             f1,
             f2,
-            var,
-            var_units,
-            final_units,
-        }    
+            var : f1.var(),
+            var_units : f1.var_units(),
+            final_units : f1.final_units(),
+        })  
     }
 }
 
@@ -357,7 +369,7 @@ impl Function for SumCalcFunction {
             Ok(closure1(x)? + closure2(x)?)
         })
     }
-    fn mult_const(&self, n : f32) -> Box<dyn CalcFunction> {
+    fn mult_const(&self, n : f32) -> Box<dyn Function> {
         Box::new(SumCalcFunction {
             var : self.var,
             var_units : self.var_units,
