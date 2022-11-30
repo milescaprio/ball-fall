@@ -74,6 +74,14 @@ impl std::ops::Div for Units {
     }
 }
 
+fn count_combinations(n: u64, r: u64) -> u64 {
+    if r > n {
+        0
+    } else {
+        (1..=r.min(n - r)).fold(1, |acc, val| acc * (n - val + 1) / val)
+    }
+}
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -289,6 +297,17 @@ impl Function for Polynomial {
     fn shift_vert(&self, n : f32) -> Box<dyn Function> {
         let mut ret = self.clone();
         ret.expression[0].coefficient += n;
+    }
+    fn shift_hor(&self, n : f32) -> Box<dyn Function> {
+        //shift the polynomial horizontally by n
+        //substitute x = x - n and each exponent for each term 
+        for monomial in &mut self.expression {
+            add_coefficients = Vec::with_capacity(self.expression.len());
+            for i in 0..=monomial.exponent {
+                add_coefficients.push(monomial.coefficient * count_combinations(monomial.exponent, i));
+            }
+            //finish this
+        }
     }
     fn stereotype() -> Box<dyn Function> {
         Box::new(Polynomial::init(Var::X, Units::M, Units::M, vec![Monomial::init(1.0, Units::M, 1)]))
