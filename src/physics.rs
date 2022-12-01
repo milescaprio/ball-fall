@@ -136,6 +136,7 @@ impl Ball {
                 self.cached_y_Function = Some(Box::new(SumFunction::from_compatible(xy1.1,xy2.1).unwrap()));
                 self.soft_update_unchecked();
             }
+        }
     }
 }
 

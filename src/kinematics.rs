@@ -162,6 +162,7 @@ pub trait Function {
     fn integrated(&self, respect : Var) -> Result<Box<dyn Function>, IntegrationError> {
         self.integrated_c(respect, 0.0)
     }
+    fn debug(&self);
 }    
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
@@ -203,6 +204,8 @@ enum KinematicsFunctions {
 
 //idea: split into maintainablefunction : function + integrationbehavior + differentiationbehavior + transformable
 //for now, just make all function maintainablefunction
+
+//impl<T> std::fmt::Debug for T where T : Function {}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Monomial {
@@ -304,7 +307,7 @@ impl Function for Polynomial {
     fn shift_hor(&self, n : f32) -> Box<dyn Function> {
         //shift the polynomial horizontally by n
         //substitute x = x - n and each exponent for each term 
-        let mut new_expression : Vec<Monomial> = (0..self.expression.len()).map(|x| Monomial::init(0.0, (self.final_units / self.var_units.pow(x as i32)), x as i32)).collect();
+        let mut new_expression : Vec<Monomial> = (0..self.expression.len()).map(|x| Monomial::init(0.0, self.final_units / self.var_units.pow(x as i32), x as i32)).collect();
         // for i in 0..self.expression.len() {
         //     new_expression.push(new_monomial);
         // }
@@ -313,6 +316,7 @@ impl Function for Polynomial {
             for i in 0..=(monomial.exponent as usize) {
                 add_coefficients.push((-n).powi(monomial.exponent - i as i32) * count_combinations(monomial.exponent as u64, i as u64) as f32 * monomial.coefficient);
             }
+            dbg!(&add_coefficients);
             for i in 0..=(monomial.exponent as usize) {
                 new_expression[i].coefficient += add_coefficients[i];
             }
@@ -351,6 +355,13 @@ impl Function for Polynomial {
             Err(IntegrationError::ProhibitedRespect)
         }    
     }
+
+    fn debug(&self) {
+        dbg!(&self.expression);
+        dbg!(self.var);
+        dbg!(self.var_units);
+        dbg!(self.final_units);
+    }
 }    
 
 // impl DifferentiationBehavior for Polynomial {
@@ -385,6 +396,7 @@ impl Function for Polynomial {
 //     }    
 // }
 
+//#[derive(Clone, Debug)]
 pub struct SumFunction {
     f1 : Box<dyn Function>,
     f2 : Box<dyn Function>,
@@ -405,11 +417,11 @@ impl SumFunction {
             return Err("Functions Contain Different Output Units");
         }
         Ok(SumFunction {
-            f1,
-            f2,
             var : f1.var(),
             var_units : f1.var_units(),
             final_units : f1.final_units(),
+            f1 : f1,
+            f2 : f2,
         })  
     }
 }
@@ -505,6 +517,11 @@ impl Function for SumFunction {
         } else {
             Err(IntegrationError::ProhibitedRespect)
         }    
+    }
+
+    fn debug(&self) {
+        self.f1.debug();
+        self.f2.debug();
     }
 }
 
@@ -628,8 +645,10 @@ mod tests {
         let b = Monomial::init(9.0, none, 1);
         let a = Monomial::init(4.0, meters.pow(-1), 2);
         let polynomial = Polynomial::init(Var::X, meters, meters, vec![c,b,a]);
-        let shifted = polynomial.shift_vert(1.0);
-        dbg!(shifted);
+        let shifted = polynomial.shift_hor(-1.0);
+        shifted.debug();
+        assert_eq!(shifted.compile().unwrap()(1.0).unwrap(), 6.0);
+        //assert_eq!(shifted.compile().unwrap()(2.0).unwrap(), 74.0);
         //vec![Monomial::init(4.0, meters.pow(-1), 0), Monomial::init(17.0, none, 1), Monomial::init(9.0, meters, 2)]);
     }
 }
