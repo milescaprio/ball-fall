@@ -132,8 +132,8 @@ impl Ball {
                 //we calculate x and y from a1 and x and y from a2 recursively then throw them into a self.cached_x_Function and self.cached_y_Function
                 let xy1 = self.recurhelper_hard_update_unchecked(a1);
                 let xy2 = self.recurhelper_hard_update_unchecked(a2);
-                self.cached_x_Function = Some(Box::new(SumCalcFunction::from_compatible(xy1.0,xy2.0).unwrap()));
-                self.cached_y_Function = Some(Box::new(SumCalcFunction::from_compatible(xy1.1,xy2.1).unwrap()));
+                self.cached_x_Function = Some(Box::new(SumFunction::from_compatible(xy1.0,xy2.0).unwrap()));
+                self.cached_y_Function = Some(Box::new(SumFunction::from_compatible(xy1.1,xy2.1).unwrap()));
                 self.soft_update_unchecked();
             }
     }

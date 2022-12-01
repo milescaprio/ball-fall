@@ -154,9 +154,9 @@ pub trait Function {
     fn stereotype() -> Self where Self : Sized; //can only be called on a variant of Function not just a dyn Function type
     //DiffrientiationBehavior
     fn differentiated(&self, respect : Var) -> Result<Box<dyn Function>, DiffrientiationError>;
-    fn differentiate( &mut self, respect : Var) -> Result<(), DiffrientiationError> {
-        self = self.differentiated(respect)?;
-    }
+    // fn differentiate( &mut self, respect : Var) -> Result<(), DiffrientiationError> {
+    //     self = self.differentiated(respect)?;
+    // }
     //IntegrationBehavior
     fn integrated_c(&self, respect : Var, c : f32) -> Result<Box<dyn Function>, IntegrationError>;
     fn integrated(&self, respect : Var) -> Result<Box<dyn Function>, IntegrationError> {
@@ -297,20 +297,29 @@ impl Function for Polynomial {
     fn shift_vert(&self, n : f32) -> Box<dyn Function> {
         let mut ret = self.clone();
         ret.expression[0].coefficient += n;
+        Box::new(ret)
     }
     fn shift_hor(&self, n : f32) -> Box<dyn Function> {
         //shift the polynomial horizontally by n
         //substitute x = x - n and each exponent for each term 
+        let mut new_expression : Vec<Monomial> = (0..self.expression.len()).map(|x| Monomial::init(0.0, (self.final_units / self.var_units.pow(x as i32)), x as i32)).collect();
+        // for i in 0..self.expression.len() {
+        //     new_expression.push(new_monomial);
+        // }
         for monomial in &mut self.expression {
-            add_coefficients = Vec::with_capacity(self.expression.len());
-            for i in 0..=monomial.exponent {
-                add_coefficients.push(monomial.coefficient * count_combinations(monomial.exponent, i));
+            let mut add_coefficients = Vec::with_capacity(self.expression.len());
+            for i in 0..=(monomial.exponent as usize) {
+                add_coefficients.push((-n).powi(monomial.exponent - i as i32) * count_combinations(monomial.exponent as u64, i as u64) as f32 * monomial.coefficient);
+            }
+            for i in 0..=(monomial.exponent as usize) {
+                new_expression[i].coefficient += add_coefficients[i];
             }
             //finish this
         }
+        Box::new(Polynomial::init(self.var, self.var_units, self.final_units, new_expression))
     }
-    fn stereotype() -> Box<dyn Function> {
-        Box::new(Polynomial::init(Var::X, Units::M, Units::M, vec![Monomial::init(1.0, Units::M, 1)]))
+    fn stereotype() -> Self {
+        Polynomial::init(Var::X, Unit::M.units(), Unit::M.units(), vec![Monomial::init(1.0, Unit::M.units(), 1)])
     }
 
     //DiffrientiationBehavior
@@ -438,9 +447,36 @@ impl Function for SumFunction {
             var : self.var,
             var_units : self.var_units,
             final_units : self.final_units,
-            f1 : self.f1.stretch(n),
-            f2 : self.f2.stretch(n),
+            f1 : self.f1.stretch_vert(n),
+            f2 : self.f2.stretch_vert(n),
         })
+    }
+    fn shift_vert(&self, n : f32) -> Box<dyn Function> {
+        Box::new(SumFunction {
+            var : self.var,
+            var_units : self.var_units,
+            final_units : self.final_units,
+            f1 : self.f1.shift_vert(n),
+            f2 : self.f2.shift_vert(n),
+        })
+    }
+    fn shift_hor(&self, n : f32) -> Box<dyn Function> {
+        Box::new(SumFunction {
+            var : self.var,
+            var_units : self.var_units,
+            final_units : self.final_units,
+            f1 : self.f1.shift_hor(n),
+            f2 : self.f2.shift_hor(n),
+        })
+    }
+    fn stereotype() -> Self where Self : Sized {
+        SumFunction {
+            f1 : Box::new(Polynomial::stereotype()),
+            f2 : Box::new(Polynomial::stereotype()),
+            var : Var::X,
+            var_units : Units::empty(),
+            final_units : Units::empty(),
+        }
     }
     fn differentiated(&self, respect : Var) -> Result<Box<dyn Function>, DiffrientiationError> {
         if respect == self.var {
@@ -455,7 +491,7 @@ impl Function for SumFunction {
             Err(DiffrientiationError::ProhibitedRespect)
         }    
     }  
-    fn integrated_c(&self, respect : Var, c : f32) -> Result<Box<dyn CalcFunction>, IntegrationError> { //preferably the function that is easier to add c to should go in f2; use bigger/more complex function first
+    fn integrated_c(&self, respect : Var, c : f32) -> Result<Box<dyn Function>, IntegrationError> { //preferably the function that is easier to add c to should go in f2; use bigger/more complex function first
         if respect == self.var {
             Ok(Box::new(SumFunction {
                 var : self.var,
@@ -467,7 +503,7 @@ impl Function for SumFunction {
         } else {
             Err(IntegrationError::ProhibitedRespect)
         }    
-    }    
+    }
 }
 
 // impl DifferentiationBehavior for SumFunction {
@@ -580,5 +616,18 @@ mod tests {
         let polynomial = Polynomial::init(Var::X, meters, meters, vec![intercept, slope]);
         let integral = polynomial.integrated_c(Var::X, 0.0).unwrap();
         assert_eq!(integral.compile().unwrap()(1.0).unwrap(), 4.0);
+    }
+    #[test]
+    fn polynomial_shift() {
+        let meter = Unit::M;
+        let meters = meter.units();
+        let none = Units::empty();
+        let c = Monomial::init(6.0, meters, 0);
+        let b = Monomial::init(9.0, none, 1);
+        let a = Monomial::init(4.0, meters.pow(-1), 2);
+        let polynomial = Polynomial::init(Var::X, meters, meters, vec![c,b,a]);
+        let shifted = polynomial.shift_vert(1.0);
+        dbg!(shifted);
+        //vec![Monomial::init(4.0, meters.pow(-1), 0), Monomial::init(17.0, none, 1), Monomial::init(9.0, meters, 2)]);
     }
 }
