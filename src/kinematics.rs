@@ -151,7 +151,9 @@ pub trait Function {
         //like a composite or product function type
     fn shift_vert(&self, n : f32) -> Box<dyn Function>;
     fn shift_hor(&self, n : f32) -> Box<dyn Function>;
+    fn get_stop_point(&self) -> f32;
     fn flip(&self, n : f32) -> Box<dyn Function>;
+    fn stop_point_multiplier(&self, n : f32, m :  f32) -> Box<dyn Function>;
     fn stereotype() -> Self where Self : Sized; //can only be called on a variant of Function not just a dyn Function type
     //DiffrientiationBehavior
     fn differentiated(&self, respect : Var) -> Result<Box<dyn Function>, DiffrientiationError>;
@@ -299,9 +301,15 @@ impl Function for Polynomial {
         }
         Box::new(Polynomial::init(self.var, self.var_units, self.final_units, new_expression))
     }
+    fn get_stop_point(&self) -> f32 {
+        -self.expression[1].coefficient / self.expression[0].coefficient / 2.0 //only works for quadratic but whatever
+    }
     fn flip(&self, n : f32) -> Box<dyn Function> {
         //thrown together, moves the polynomial to the other side of the x axis
-        self.shift_hor(2.0*n-self.expression[1].coefficient / self.expression[0].coefficient)
+        self.shift_hor(2.0*n+self.get_stop_point()*2)
+    }
+    fn stop_point_multiplier(&self, n : f32, m : f32) -> Box<dyn Function> {
+        self.shift_hor((1 + m)* n + self.get_stop_point() * 2)
     }
     fn stereotype() -> Self {
         Polynomial::init(Var::X, Unit::M.units(), Unit::M.units(), vec![Monomial::init(1.0, Unit::M.units(), 1)])
@@ -436,6 +444,27 @@ impl Function for SumFunction {
             final_units : self.final_units,
             f1 : self.f1.flip(n),
             f2 : self.f2.flip(n),
+        })
+    }
+    fn get_stop_point(&self) -> f32 {
+        f1.get_stop_point()
+    }
+    fn flip(&self, n : f32) -> Box<dyn Function> {
+        Box::new(SumFunction {
+            var : self.var,
+            var_units : self.var_units,
+            final_units : self.final_units,
+            f1 : self.f1.flip(n),
+            f2 : self.f2.flip(n),
+        })
+    }
+    fn stop_point_multiplier(&self, n : f32, m : f32) -> Box<dyn Function> {
+        Box::new(SumFunction {
+            var : self.var,
+            var_units : self.var_units,
+            final_units : self.final_units,
+            f1 : self.f1.stop_point_multiplier(n),
+            f2 : self.f2.stop_point_multiplier(n),
         })
     }
     fn stereotype() -> Self where Self : Sized {

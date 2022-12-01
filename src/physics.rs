@@ -234,7 +234,12 @@ mod tests {
                 )
             )
         ); 
-        myspace.new_ball_unchecked(0.0, 0.0, 1.0, 1.0);
+        myspace.x1 = -20;
+        myspace.x2 = 20;
+        myspace.y1 = -10;
+        myspace.y2 = 30;
+        myspace.new_ball_unchecked(0.0, 25.0, 1.0, 1.0);
+        myspace.new_ball_unchecked(2.0, 13.0, 0.5, 0.5);
         myspace.tick(1.0);
     }
 }
