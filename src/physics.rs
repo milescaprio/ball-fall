@@ -5,22 +5,23 @@ use kinematics::Polynomial;
 use kinematics::Unit;
 use kinematics::Units;
 use kinematics::Var;
-const GRAVITY_MPS2: f32 = -9.81;
+use kinematics::EvalFunctionError;
+pub const GRAVITY_MPS2: f32 = -9.81;
 
 struct FunctionCache {
-    pub closure: fn(f32) -> f32,
+    pub closure: Box<dyn Fn(f32) -> Result<f32, EvalFunctionError>>,
 }
 
 impl Default for FunctionCache {
     fn default() -> Self {
         Self {
-            closure: |x| x,
+            closure: Box::new(|x| Ok(x)),
         }
     }
 }
 
 impl FunctionCache {
-    pub fn new(closure: fn(f32) -> f32) -> Self {
+    pub fn new(closure: Box<dyn Fn(f32) -> Result<f32, EvalFunctionError>>) -> Self {
         Self {
             closure,
         }
@@ -28,7 +29,7 @@ impl FunctionCache {
 }
 
 #[derive(Default)]
-struct Ball {
+pub struct Ball {
     x: f32,
     y: f32,
     radius: f32,
@@ -39,23 +40,24 @@ struct Ball {
     cached_y_Function : Option<Box<dyn Function>>,
 }
 
-struct Angle {
+pub struct Angle {
     deg : f32,
 }
 
-struct Space {
+pub struct Space {
     time_units : Units,
     space_units : Units,
     mass_units : Units,
-    x1: f32,
-    y1: f32,
-    x2: f32,
-    y2: f32,
+    pub x1: f32,
+    pub y1: f32,
+    pub x2: f32,
+    pub y2: f32,
     floor: f32,
     a : AccelxyFunction,
     //pixelx: fn(f32) -> usize,
     elapsed: f32,
     pub balls: Vec<Ball>,
+    //pub last_ball_poses : Vec<(f32, f32)>,
 }
 
 impl Angle {
@@ -68,7 +70,7 @@ impl Angle {
     }
 }
 
-enum AccelxyFunction {
+pub enum AccelxyFunction {
     ParterFunctionVector(Box<dyn Function>, Angle),
     IndependentFunctions(Box<dyn Function>, Box<dyn Function>),
     CompositeAcceleration(Box<AccelxyFunction>, Box<AccelxyFunction>),
@@ -84,8 +86,18 @@ impl Ball {
         // self.y = y;
     }
     pub fn soft_update(&mut self) -> Result<(), kinematics::FunctionInternalError> {
-        self.fx = FunctionCache::new(self.cached_x_Function.as_ref().expect("No cache, unable to soft update!").compile()?);
-        self.fy = FunctionCache::new(self.cached_y_Function.as_ref().expect("No cache, unable to soft update!").compile()?);
+        let fcx = self.cached_x_Function.as_ref().expect("No cache, unable to soft update!").compile()?;
+        let fcy = self.cached_y_Function.as_ref().expect("No cache, unable to soft update!").compile()?;
+        self.fx = FunctionCache::new(fcx);
+        self.fy = FunctionCache::new(fcy);
+        // if let Ok(fc) = self.cached_x_Function.as_ref().expect("No cache, unable to soft update!").compile() {
+        //     self.fx = fc;
+        // } else {
+        //     return Err(kinematics::FunctionInternalError::new("Unable to compile x function!"));
+        // }
+        // if let Ok(fc) = self.cached_y_Function.as_ref().expect("No cache, unable to soft update!").compile() {
+        //     self.fy = fc;
+        // }
         Ok(())
         // self.x = x;
         // self.y = y;
@@ -94,8 +106,8 @@ impl Ball {
         if let AccelxyFunction::ParterFunctionVector(a, d) = a_ref {
             let cached_d_Function = a .integrated(Var::S).unwrap().integrated(Var::S).unwrap();
             return (
-                cached_d_Function.mult_const(d.xy_h(1.).0),
-                cached_d_Function.mult_const(d.xy_h(1.).1)
+                cached_d_Function.stretch_vert(d.xy_h(1.).0),
+                cached_d_Function.stretch_vert(d.xy_h(1.).1)
             );
         }
         else if let AccelxyFunction::IndependentFunctions(ax, ay) = a_ref {
@@ -112,19 +124,22 @@ impl Ball {
                 Box::new(SumFunction::from_compatible(xy1.1,xy2.1).unwrap()),
             )
         }
+        else {
+            panic!("Unknown AccelxyFunction variant!");
+        }
     }
     pub fn hard_update_unchecked(&mut self, a_ref : &AccelxyFunction) {
         use AccelxyFunction::*;
         match a_ref {
             ParterFunctionVector(a, d) => {
                 let cached_d_Function = a .integrated(Var::X).unwrap().integrated(Var::Y).unwrap();
-                self.cached_x_Function = Some(cached_d_Function.mult_const(d.xy_h(1.0).0));
-                self.cached_y_Function = Some(cached_d_Function.mult_const(d.xy_h(1.0).1));
+                self.cached_x_Function = Some(cached_d_Function.stretch_vert(d.xy_h(1.0).0));
+                self.cached_y_Function = Some(cached_d_Function.stretch_vert(d.xy_h(1.0).1));
                 self.soft_update_unchecked();
             }
             IndependentFunctions(ax, ay) => {
-                self.cached_x_Function = Some(ax.integrated(Var::X).unwrap().integrated(Var::X).unwrap());
-                self.cached_y_Function = Some(ay.integrated(Var::Y).unwrap().integrated(Var::Y).unwrap());
+                self.cached_x_Function = Some(ax.integrated(Var::T).unwrap().integrated(Var::T).unwrap());
+                self.cached_y_Function = Some(ay.integrated(Var::T).unwrap().integrated(Var::T).unwrap());
                 self.soft_update_unchecked();
             }
             CompositeAcceleration(a1, a2) => {
@@ -138,10 +153,19 @@ impl Ball {
             }
         }
     }
+    pub fn curr_x(&self) -> f32 {
+        self.x
+    }
+    pub fn curr_y(&self) -> f32 {
+        self.y
+    }
+    pub fn get_radius(&self) -> f32 {
+        self.radius
+    }
 }
 
 impl Space {
-    fn blank(a : AccelxyFunction) -> Space {
+    pub fn blank(a : AccelxyFunction) -> Space {
         Space {
             x1 : -10.0,
             x2 : 10.0,
@@ -158,7 +182,7 @@ impl Space {
         }
     }
 
-    fn new_ball_unchecked(&mut self, x : f32, y : f32, r : f32, m : f32){
+    pub fn new_ball_unchecked(&mut self, x : f32, y : f32, r : f32, m : f32){
         let mut ret = Ball::default();
         ret.x = x;
         ret.y = y;
@@ -168,13 +192,25 @@ impl Space {
         self.balls.push(ret);
     }
 
-    fn tick(&mut self, dt: f32) {
+    pub fn tick(&mut self, dt: f32) {
         self.elapsed += dt;
         for ball in &mut self.balls {
             //keep track of the cached calculus functions
             //check if last acceleration for ball was different and then recompile the cached calculus polynomial if so
             let (x, y) = ((ball.fx.closure)(self.elapsed), (ball.fy.closure)(self.elapsed));
+            ball.x = x.unwrap();
+            ball.y = y.unwrap();
+            if ball.x < self.x1 {
+                ball.cached_x_Function = Some(ball.cached_x_Function.as_ref().expect("No cache, unable to soft update!").flip(self.elapsed));
+            }
+            if ball.y < self.y1 {
+                ball.cached_y_Function = Some(ball.cached_y_Function.as_ref().expect("No cache, unable to soft update!").flip(self.elapsed));
+            }
         }
+    }
+
+    pub fn get_elapsed(&self) -> f32 {
+        self.elapsed
     }
 }
 

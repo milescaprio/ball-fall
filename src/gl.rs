@@ -14,8 +14,8 @@ type UpdateFunction = Box<dyn FnMut(u64)>;
 static OPENGL_VER : OpenGL = OpenGL::V4_0;
 
 pub struct Window {
-    width : usize,
-    height : usize,
+    pub width : usize,
+    pub height : usize,
     gl : Option<GlGraphics>,
     window : Option<GlutinWindow>,
     events : Events,
@@ -38,7 +38,7 @@ impl Window {
     const SRGB : u32 = 0x32;
     const CONTROLLERS : u32 = 0x64;
     const LAZY : u32 = 0x128;
-    const DEFAULT_FLAGS : u32 = Self::EXIT_ON_ESC | Self::RESIZABLE | Self::VSYNC | Self::DECORATED;
+    pub const DEFAULT_FLAGS : u32 = Self::EXIT_ON_ESC | Self::RESIZABLE | Self::VSYNC | Self::DECORATED;
 
     pub fn new(width : usize, height : usize) -> Window {
         //Create a new window
@@ -63,17 +63,17 @@ impl Window {
             "",
             [self.width as u32, self.height as u32],
         ).opengl(OPENGL_VER)
-            .resizable(FLAGS & Self::RESIZABLE != 0)
-            .exit_on_esc(FLAGS & Self::EXIT_ON_ESC != 0)
-            .vsync(FLAGS & Self::VSYNC != 0)
+            //.resizable(FLAGS & Self::RESIZABLE != 0)
+            .exit_on_esc(true)//FLAGS & Self::EXIT_ON_ESC != 0)
+            .vsync(true)//FLAGS & Self::VSYNC != 0)
             .title(title)
-            .fullscreen(FLAGS & Self::FULLSCREEN != 0)
-            .decorated(FLAGS & Self::DECORATED != 0)
-            .controllers(FLAGS & Self::CONTROLLERS != 0)
-            .srgb(FLAGS & Self::SRGB != 0)
+            //.fullscreen(FLAGS & Self::FULLSCREEN != 0)
+            .decorated(true)//FLAGS & Self::DECORATED != 0)
+            //.controllers(FLAGS & Self::CONTROLLERS != 0)
+            //.srgb(FLAGS & Self::SRGB != 0)
             .build().unwrap());
         self.events = self.events
-            .lazy(FLAGS | Self::LAZY != 0);
+            .lazy(false);//FLAGS | Self::LAZY != 0);
         self.gl = Some(GlGraphics::new(OPENGL_VER));
     }   
     // pub fn edit(&mut self, title : String, FLAGS : u32) {
@@ -89,15 +89,15 @@ impl Window {
         if self.window.is_none() {
             return;
         }
-        print_type_of(&mut self.window)
-        // while let Some(e) = self.events.as_ref().unwrap().next() {
-        //     if let Some(r) = e.render_args() {
-        //         self.render(&r);
-        //     }
-        //     if let Some(u) = e.update_args() {
-        //         self.update(&u);
-        //     }
-        // }
+        //print_type_of(&mut self.window)
+        while let Some(e) = self.events.next(self.window.as_mut().expect("no window")) {
+            if let Some(r) = e.render_args() {
+                self.render(&r);
+            }
+            if let Some(u) = e.update_args() {
+                self.update(&u);
+            }
+        }
     }
     pub fn set_ups(&mut self, new_ups : u64) -> Option<()>{
         self.events.set_ups(new_ups);
