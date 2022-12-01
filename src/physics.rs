@@ -90,17 +90,7 @@ impl Ball {
         let fcy = self.cached_y_Function.as_ref().expect("No cache, unable to soft update!").compile()?;
         self.fx = FunctionCache::new(fcx);
         self.fy = FunctionCache::new(fcy);
-        // if let Ok(fc) = self.cached_x_Function.as_ref().expect("No cache, unable to soft update!").compile() {
-        //     self.fx = fc;
-        // } else {
-        //     return Err(kinematics::FunctionInternalError::new("Unable to compile x function!"));
-        // }
-        // if let Ok(fc) = self.cached_y_Function.as_ref().expect("No cache, unable to soft update!").compile() {
-        //     self.fy = fc;
-        // }
         Ok(())
-        // self.x = x;
-        // self.y = y;
     }
     fn recurhelper_hard_update_unchecked(&self, a_ref : &AccelxyFunction) -> (Box<dyn Function>, Box<dyn Function>) {
         if let AccelxyFunction::ParterFunctionVector(a, d) = a_ref {

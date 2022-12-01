@@ -178,29 +178,6 @@ enum KinematicsFunctions {
 //todo: make these checked/unchecked, forcing implementation of both checked and unchecked for odd functions
 //to figure out their own FullyUnintegrable/FullyUndifferentiable/UnknownResultFormat errors in the checked version or use make a PartialIntegrable for functions that are sometimes integrable and require an errored version
 
-// pub trait IntegrationBehavior {
-    // //A trait that specifies that the function has known integration behavior. Recommended to implement this trait to convenience other composite functions,
-    // //as sometimes the integrals are propogated down. Even if it just returns an integration error it means it can be put into functions that require it
-    // //in case they are possibly integrated
-    // //Todo: make this more intuitive, to predict behavior of dyn Functions, only forcing integratability when needed
-    // fn integrate_c(&self, respect : Var, c : f32) -> Result<Box<dyn CalcFunction>, IntegrationError>;
-    // fn integrate(&self, respect : Var) -> Result<Box<dyn CalcFunction>, IntegrationError> {
-    //     self.integrate_c(respect, 0.0)
-    // }
-    
-// }
-
-// pub trait DifferentiationBehavior {
-//     //A trait that specifies that the function has known diffrientiation behavior. Recommended to implement this trait to convenience other composite functions,
-//     //as sometimes the derivatives are propogated down. Even if it just returns a differentiation error it means it can be put into functions that require it
-//     //in case they are possibly differentiated
-//     //Todo: make this more intuitive, to predict behavior of dyn Functions, only forcing differentiability when needed
-//     fn differentiate(&self, respect : Var) -> Result<Box<dyn CalcFunction>, DiffrientiationError>;
-// }
-
-// pub trait CalcFunction : Function + IntegrationBehavior + DifferentiationBehavior {}
-// impl<T> CalcFunction for T where T: Function + IntegrationBehavior + DifferentiationBehavior {}
-
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
 //idea: split into maintainablefunction : function + integrationbehavior + differentiationbehavior + transformable
@@ -309,9 +286,6 @@ impl Function for Polynomial {
         //shift the polynomial horizontally by n
         //substitute x = x - n and each exponent for each term 
         let mut new_expression : Vec<Monomial> = (0..self.expression.len()).map(|x| Monomial::init(0.0, self.final_units / self.var_units.pow(x as i32), x as i32)).collect();
-        // for i in 0..self.expression.len() {
-        //     new_expression.push(new_monomial);
-        // }
         for monomial in &self.expression {
             let mut add_coefficients = Vec::with_capacity(self.expression.len());
             for i in 0..=(monomial.exponent as usize) {
@@ -369,39 +343,6 @@ impl Function for Polynomial {
     }
 }    
 
-// impl DifferentiationBehavior for Polynomial {
-//     fn mult_const_calc(&self, n : f32) -> Box<dyn CalcFunction>; //this is a dumb solution, everything sorta fell apart with the CalcFunction, but I have nothing better right now
-//     fn differentiate(&self, respect : Var) -> Result<Box<dyn CalcFunction>, DiffrientiationError> {
-//         if respect == self.var {
-//             let mut derivative : Vec<Monomial> = Vec::new();
-//             for monomial in &self.expression {
-//                 if monomial.exponent != 0 {
-//                     derivative.push(Monomial::init(monomial.coefficient * monomial.exponent as f32, monomial.units_coefficient, monomial.exponent - 1));
-//                 } 
-//             }    
-//             Ok(Box::new(Polynomial::init(self.var, self.var_units, self.final_units / self.var_units, derivative)))
-//         } else {
-//             Err(DiffrientiationError::ProhibitedRespect)
-//         }    
-//     }    
-// }    
-
-// impl IntegrationBehavior for Polynomial {
-//     fn integrate_c(&self, respect : Var, c : f32) -> Result<Box<dyn CalcFunction>, IntegrationError> {
-//         if respect == self.var {
-//             let mut integral : Vec<Monomial> = Vec::new();
-//             integral.push(Monomial { coefficient: c, units_coefficient: self.final_units * self.var_units, exponent: 0 });
-//             for monomial in &self.expression {
-//                 integral.push(Monomial::init(monomial.coefficient / (monomial.exponent + 1) as f32, monomial.units_coefficient, monomial.exponent + 1));
-//             }
-//             Ok(Box::new(Polynomial::init(self.var, self.var_units, self.final_units * self.var_units, integral)))
-//         } else {
-//             Err(IntegrationError::ProhibitedRespect)
-//         }    
-//     }    
-// }
-
-//#[derive(Clone, Debug)]
 pub struct SumFunction {
     f1 : Box<dyn Function>,
     f2 : Box<dyn Function>,
@@ -538,39 +479,6 @@ impl Function for SumFunction {
         self.f2.debug();
     }
 }
-
-// impl DifferentiationBehavior for SumFunction {
-//     fn differentiate(&self, respect : Var) -> Result<Box<dyn Function>, DiffrientiationError> {
-//         if respect == self.var {
-//             Ok(Box::new(SumFunction {
-//                 var : self.var,
-//                 var_units : self.var_units,
-//                 final_units : self.final_units,
-//                 f1 : self.f1.differentiate(respect)?,
-//                 f2 : self.f2.differentiate(respect)?,
-//             }))
-//         } else {
-//             Err(DiffrientiationError::ProhibitedRespect)
-//         }    
-//     }    
-// }    
-
-// impl IntegrationBehavior for SumFunction {
-//     fn integrate_c(&self, respect : Var, c : f32) -> Result<Box<dyn CalcFunction>, IntegrationError> { //preferably the function that is easier to add c to should go in f2; use bigger/more complex function first
-//         if respect == self.var {
-//             Ok(Box::new(SumFunction {
-//                 var : self.var,
-//                 var_units : self.var_units,
-//                 final_units : self.final_units,
-//                 f1 : self.f1.integrate(respect)?,
-//                 f2 : self.f2.integrate_c(respect, c)?,
-//             }))
-//         } else {
-//             Err(IntegrationError::ProhibitedRespect)
-//         }    
-//     }    
-// }
-
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
