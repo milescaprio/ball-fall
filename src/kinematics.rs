@@ -201,6 +201,9 @@ enum KinematicsFunctions {
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
+//idea: split into maintainablefunction : function + integrationbehavior + differentiationbehavior + transformable
+//for now, just make all function maintainablefunction
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Monomial {
     pub coefficient : f32,
@@ -287,7 +290,6 @@ impl Function for Polynomial {
         })    
     }
     fn stretch_vert(&self, n : f32) -> Box<dyn Function> {
-        let mut product : Vec<Monomial> = Vec::new();
         let mut ret = self.clone();
         for monomial in &mut ret.expression {
             monomial.coefficient *= n;
@@ -306,7 +308,7 @@ impl Function for Polynomial {
         // for i in 0..self.expression.len() {
         //     new_expression.push(new_monomial);
         // }
-        for monomial in &mut self.expression {
+        for monomial in &self.expression {
             let mut add_coefficients = Vec::with_capacity(self.expression.len());
             for i in 0..=(monomial.exponent as usize) {
                 add_coefficients.push((-n).powi(monomial.exponent - i as i32) * count_combinations(monomial.exponent as u64, i as u64) as f32 * monomial.coefficient);

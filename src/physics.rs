@@ -69,8 +69,8 @@ impl Angle {
 }
 
 enum AccelxyFunction {
-    ParterFunctionVector(Box<dyn CalcFunction>, Angle),
-    IndependentFunctions(Box<dyn CalcFunction>, Box<dyn CalcFunction>),
+    ParterFunctionVector(Box<dyn Function>, Angle),
+    IndependentFunctions(Box<dyn Function>, Box<dyn Function>),
     CompositeAcceleration(Box<AccelxyFunction>, Box<AccelxyFunction>),
 }
 
@@ -90,7 +90,7 @@ impl Ball {
         // self.x = x;
         // self.y = y;
     }
-    fn recurhelper_hard_update_unchecked(&self, a_ref : &AccelxyFunction) -> (Box<dyn CalcFunction>, Box<dyn CalcFunction>) {
+    fn recurhelper_hard_update_unchecked(&self, a_ref : &AccelxyFunction) -> (Box<dyn Function>, Box<dyn Function>) {
         if let AccelxyFunction::ParterFunctionVector(a, d) = a_ref {
             let cached_d_Function = a .integrated(Var::S).unwrap().integrated(Var::S).unwrap();
             return (
@@ -108,8 +108,8 @@ impl Ball {
             let xy1 = self.recurhelper_hard_update_unchecked(&a1);
             let xy2 = self.recurhelper_hard_update_unchecked(&a2);
             (
-                Box::new(SumCalcFunction::from_compatible(xy1.0,xy2.0).unwrap()),
-                Box::new(SumCalcFunction::from_compatible(xy1.1,xy2.1).unwrap()),
+                Box::new(SumFunction::from_compatible(xy1.0,xy2.0).unwrap()),
+                Box::new(SumFunction::from_compatible(xy1.1,xy2.1).unwrap()),
             )
         }
     }
