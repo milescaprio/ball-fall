@@ -6,7 +6,7 @@ use kinematics::Unit;
 use kinematics::Units;
 use kinematics::Var;
 use kinematics::EvalFunctionError;
-pub const GRAVITY_MPS2: f32 = -16.81;
+pub const GRAVITY_MPS2: f32 = -100.81;
 
 struct FunctionCache {
     pub closure: Box<dyn Fn(f32) -> Result<f32, EvalFunctionError>>,
@@ -33,11 +33,11 @@ pub enum MaybeNew {
     NoUpdate,
 }
 
-pub struct NewRefTime {
+pub struct Recalculate {
     pub val : (MaybeNew, MaybeNew),
 }
 
-impl NewRefTime {
+impl Recalculate {
     pub fn x(t : f32) -> Self {
         Self {
             val : (MaybeNew::Update(t), MaybeNew::NoUpdate),
@@ -88,7 +88,7 @@ pub struct Space {
     pub y1: f32,
     pub x2: f32,
     pub y2: f32,
-    floor: f32,
+    pub floor: f32,
     a : AccelxyFunction,
     //pixelx: fn(f32) -> usize,
     elapsed: f32,
@@ -154,7 +154,7 @@ impl Ball {
             panic!("Unknown AccelxyFunction variant!");
         }
     }
-    pub fn hard_update_unchecked(&mut self, a_ref : &AccelxyFunction, xi : f32, yi : f32, vxi : f32, vyi : f32, t : NewRefTime) {
+    pub fn hard_update_unchecked(&mut self, a_ref : &AccelxyFunction, xi : f32, yi : f32, vxi : f32, vyi : f32, t : Recalculate) {
         use AccelxyFunction::*;
         match a_ref {
             ParterFunctionVector(a, d) => {
@@ -165,10 +165,14 @@ impl Ball {
                 self.soft_update_unchecked();
             }
             IndependentFunctions(ax, ay) => {
-                if let MaybeNew::Update(x) = t.val.0 {self.x_reftime = x};
-                if let MaybeNew::Update(y) = t.val.1 {self.y_reftime = y};
-                self.cached_x_dyn_function = Some(ax.integrated_c(Var::T, vxi).expect("Integration Error").integrated_c(Var::T, xi).expect("Integration Error"));
-                self.cached_y_dyn_function = Some(ay.integrated_c(Var::T, vyi).expect("Integration Error").integrated_c(Var::T, yi).expect("Integration Error"));
+                if let MaybeNew::Update(x) = t.val.0 {
+                    self.x_reftime = x; 
+                    self.cached_x_dyn_function = Some(ax.integrated_c(Var::T, vxi).expect("Integration Error").integrated_c(Var::T, xi).expect("Integration Error"));
+                }
+                if let MaybeNew::Update(y) = t.val.1 {
+                    self.y_reftime = y; 
+                    self.cached_y_dyn_function = Some(ay.integrated_c(Var::T, vyi).expect("Integration Error").integrated_c(Var::T, yi).expect("Integration Error"));
+                }
                 self.soft_update_unchecked();
             }
             CompositeAcceleration(a1, a2) => {
@@ -252,7 +256,7 @@ impl Space {
         ret.mass = m;
         ret.color = color;
         ret.bounce = b;
-        ret.hard_update_unchecked(&self.a, ret.x, ret.y, vxi, vyi, NewRefTime::no_update());
+        ret.hard_update_unchecked(&self.a, ret.x, ret.y, vxi, vyi, Recalculate::xy(0.0,0.0));
         self.balls.push(ret);
     }
 
@@ -266,11 +270,11 @@ impl Space {
             ball.y = y.unwrap();
             if ball.x < self.x1 || ball.x > self.x2 {
                 // ball.cached_x_dyn_function = Some(ball.cached_x_dyn_function.as_ref().expect("No cache, unable to soft update!").flip(self.elapsed));
-                ball.hard_update_unchecked(&self.a, ball.get_x(), ball.get_y(), -ball.get_vx(self.elapsed), ball.get_vy(self.elapsed), NewRefTime::x(self.elapsed));
+                ball.hard_update_unchecked(&self.a, ball.get_x(), ball.get_y(), -ball.get_vx(self.elapsed), ball.get_vy(self.elapsed), Recalculate::x(self.elapsed));
             }
             if ball.y < self.floor {
                 // ball.cached_y_dyn_function = Some(ball.cached_y_dyn_function.as_ref().expect("No cache, unable to soft update!").flip(self.elapsed));
-                ball.hard_update_unchecked(&self.a, ball.get_x(), ball.get_y(), ball.get_vx(self.elapsed), -ball.get_vy(self.elapsed), NewRefTime::y(self.elapsed));
+                ball.hard_update_unchecked(&self.a, ball.get_x(), ball.get_y(), ball.get_vx(self.elapsed), -ball.get_vy(self.elapsed), Recalculate::y(self.elapsed));
             }
             ball.soft_update_unchecked();
         }

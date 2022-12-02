@@ -147,13 +147,6 @@ pub trait Function {
     }
 
     fn stretch_vert(&self, n : f32) -> Box<dyn Function>;
-        //if your function is for some reason not able to handle coefficients, you can return a different type,
-        //like a composite or product function type
-    fn shift_vert(&self, n : f32) -> Box<dyn Function>;
-    fn shift_hor(&self, n : f32) -> Box<dyn Function>;
-    fn get_stop_point(&self) -> f32;
-    fn flip(&self, n : f32) -> Box<dyn Function>;
-    fn stop_point_multiplier(&self, n : f32, m :  f32) -> Box<dyn Function>;
     fn stereotype() -> Self where Self : Sized; //can only be called on a variant of Function not just a dyn Function type
     //DiffrientiationBehavior
     fn differentiated(&self, respect : Var) -> Result<Box<dyn Function>, DiffrientiationError>;
@@ -279,38 +272,23 @@ impl Function for Polynomial {
         }    
         Box::new(ret)
     }
-    fn shift_vert(&self, n : f32) -> Box<dyn Function> {
-        let mut ret = self.clone();
-        ret.expression[0].coefficient += n;
-        Box::new(ret)
-    }
-    fn shift_hor(&self, n : f32) -> Box<dyn Function> {
-        //shift the polynomial horizontally by n
-        //substitute x = x - n and each exponent for each term 
-        let mut new_expression : Vec<Monomial> = (0..self.expression.len()).map(|x| Monomial::init(0.0, self.final_units / self.var_units.pow(x as i32), x as i32)).collect();
-        for monomial in &self.expression {
-            let mut add_coefficients = Vec::with_capacity(self.expression.len());
-            for i in 0..=(monomial.exponent as usize) {
-                add_coefficients.push((-n).powi(monomial.exponent - i as i32) * count_combinations(monomial.exponent as u64, i as u64) as f32 * monomial.coefficient);
-            }
-            //dbg!(&add_coefficients);
-            for i in 0..=(monomial.exponent as usize) {
-                new_expression[i].coefficient += add_coefficients[i];
-            }
-            //finish this
-        }
-        Box::new(Polynomial::init(self.var, self.var_units, self.final_units, new_expression))
-    }
-    fn get_stop_point(&self) -> f32 {
-        -self.expression[1].coefficient / self.expression[0].coefficient / 2.0 //only works for quadratic but whatever
-    }
-    fn flip(&self, n : f32) -> Box<dyn Function> {
-        //thrown together, moves the polynomial to the other side of the x axis
-        self.shift_hor(2.0*n+self.get_stop_point()*2.0)
-    }
-    fn stop_point_multiplier(&self, n : f32, m : f32) -> Box<dyn Function> {
-        self.shift_hor((1.0 + m)* n + self.get_stop_point() * 2.0)
-    }
+    // fn shift_hor(&self, n : f32) -> Box<dyn Function> {
+    //     //shift the polynomial horizontally by n
+    //     //substitute x = x - n and each exponent for each term 
+    //     let mut new_expression : Vec<Monomial> = (0..self.expression.len()).map(|x| Monomial::init(0.0, self.final_units / self.var_units.pow(x as i32), x as i32)).collect();
+    //     for monomial in &self.expression {
+    //         let mut add_coefficients = Vec::with_capacity(self.expression.len());
+    //         for i in 0..=(monomial.exponent as usize) {
+    //             add_coefficients.push((-n).powi(monomial.exponent - i as i32) * count_combinations(monomial.exponent as u64, i as u64) as f32 * monomial.coefficient);
+    //         }
+    //         //dbg!(&add_coefficients);
+    //         for i in 0..=(monomial.exponent as usize) {
+    //             new_expression[i].coefficient += add_coefficients[i];
+    //         }
+    //         //finish this
+    //     }
+    //     Box::new(Polynomial::init(self.var, self.var_units, self.final_units, new_expression))
+    // }
     fn stereotype() -> Self {
         Polynomial::init(Var::X, Unit::M.units(), Unit::M.units(), vec![Monomial::init(1.0, Unit::M.units(), 1)])
     }
@@ -417,45 +395,6 @@ impl Function for SumFunction {
             final_units : self.final_units,
             f1 : self.f1.stretch_vert(n),
             f2 : self.f2.stretch_vert(n),
-        })
-    }
-    fn shift_vert(&self, n : f32) -> Box<dyn Function> {
-        Box::new(SumFunction {
-            var : self.var,
-            var_units : self.var_units,
-            final_units : self.final_units,
-            f1 : self.f1.shift_vert(n),
-            f2 : self.f2.shift_vert(n),
-        })
-    }
-    fn shift_hor(&self, n : f32) -> Box<dyn Function> {
-        Box::new(SumFunction {
-            var : self.var,
-            var_units : self.var_units,
-            final_units : self.final_units,
-            f1 : self.f1.shift_hor(n),
-            f2 : self.f2.shift_hor(n),
-        })
-    }
-    fn flip(&self, n : f32) -> Box<dyn Function> {
-        Box::new(SumFunction {
-            var : self.var,
-            var_units : self.var_units,
-            final_units : self.final_units,
-            f1 : self.f1.flip(n),
-            f2 : self.f2.flip(n),
-        })
-    }
-    fn get_stop_point(&self) -> f32 {
-        self.f1.get_stop_point()
-    }
-    fn stop_point_multiplier(&self, n : f32, m : f32) -> Box<dyn Function> {
-        Box::new(SumFunction {
-            var : self.var,
-            var_units : self.var_units,
-            final_units : self.final_units,
-            f1 : self.f1.stop_point_multiplier(n,m),
-            f2 : self.f2.stop_point_multiplier(n,m),
         })
     }
     fn stereotype() -> Self where Self : Sized {
