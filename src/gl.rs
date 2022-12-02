@@ -23,6 +23,7 @@ pub struct Window {
     utick : u64,
     renderf : Option<Box<dyn FnMut(u64, u64, graphics::Context, &mut GlGraphics)>>,
     updatef : Option<Box<dyn FnMut(u64)>>,
+
 }
 fn print_type_of<T>(_: &T) {
     println!("{}", std::any::type_name::<T>())

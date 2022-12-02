@@ -293,7 +293,7 @@ impl Function for Polynomial {
             for i in 0..=(monomial.exponent as usize) {
                 add_coefficients.push((-n).powi(monomial.exponent - i as i32) * count_combinations(monomial.exponent as u64, i as u64) as f32 * monomial.coefficient);
             }
-            dbg!(&add_coefficients);
+            //dbg!(&add_coefficients);
             for i in 0..=(monomial.exponent as usize) {
                 new_expression[i].coefficient += add_coefficients[i];
             }
@@ -306,10 +306,10 @@ impl Function for Polynomial {
     }
     fn flip(&self, n : f32) -> Box<dyn Function> {
         //thrown together, moves the polynomial to the other side of the x axis
-        self.shift_hor(2.0*n+self.get_stop_point()*2)
+        self.shift_hor(2.0*n+self.get_stop_point()*2.0)
     }
     fn stop_point_multiplier(&self, n : f32, m : f32) -> Box<dyn Function> {
-        self.shift_hor((1 + m)* n + self.get_stop_point() * 2)
+        self.shift_hor((1.0 + m)* n + self.get_stop_point() * 2.0)
     }
     fn stereotype() -> Self {
         Polynomial::init(Var::X, Unit::M.units(), Unit::M.units(), vec![Monomial::init(1.0, Unit::M.units(), 1)])
@@ -447,24 +447,15 @@ impl Function for SumFunction {
         })
     }
     fn get_stop_point(&self) -> f32 {
-        f1.get_stop_point()
-    }
-    fn flip(&self, n : f32) -> Box<dyn Function> {
-        Box::new(SumFunction {
-            var : self.var,
-            var_units : self.var_units,
-            final_units : self.final_units,
-            f1 : self.f1.flip(n),
-            f2 : self.f2.flip(n),
-        })
+        self.f1.get_stop_point()
     }
     fn stop_point_multiplier(&self, n : f32, m : f32) -> Box<dyn Function> {
         Box::new(SumFunction {
             var : self.var,
             var_units : self.var_units,
             final_units : self.final_units,
-            f1 : self.f1.stop_point_multiplier(n),
-            f2 : self.f2.stop_point_multiplier(n),
+            f1 : self.f1.stop_point_multiplier(n,m),
+            f2 : self.f2.stop_point_multiplier(n,m),
         })
     }
     fn stereotype() -> Self where Self : Sized {
