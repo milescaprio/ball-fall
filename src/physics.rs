@@ -189,6 +189,15 @@ impl Ball {
             }
         }
     }
+     fn new_v2p(m1 : f32, m2 : f32, v1 : f32, v2 : f32) -> f32 {
+        2.0*m1*v1/(m1+m2) - (m1-m2)/(m1+m2)*v2
+    }
+    fn new_v1(m1 : f32, m2 : f32, v1 : f32, v2 : f32) -> f32 {
+        2.0*m2*v2/(m1+m2) + (m1-m2)/(m1+m2)*v1
+    }
+    pub fn collide(&mut self, &mut other : Ball) {
+        
+    }
     pub fn get_x(&self) -> f32 {
         self.x
     }
