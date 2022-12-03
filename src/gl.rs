@@ -68,7 +68,7 @@ impl Window {
             .exit_on_esc(true)//FLAGS & Self::EXIT_ON_ESC != 0)
             .vsync(true)//FLAGS & Self::VSYNC != 0)
             .title(title)
-            //.fullscreen(FLAGS & Self::FULLSCREEN != 0)
+            .fullscreen(FLAGS & Self::FULLSCREEN != 0)
             .decorated(true)//FLAGS & Self::DECORATED != 0)
             //.controllers(FLAGS & Self::CONTROLLERS != 0)
             //.srgb(FLAGS & Self::SRGB != 0)

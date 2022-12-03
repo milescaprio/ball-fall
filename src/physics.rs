@@ -262,19 +262,36 @@ impl Space {
 
     pub fn tick(&mut self, dt: f32) {
         self.elapsed += dt;
+        let mut i = 0;
         for ball in &mut self.balls {
             //keep track of the cached calculus functions
             //check if last acceleration for ball was different and then recompile the cached calculus polynomial if so
             let (x, y) = ((ball.fx.closure)(self.elapsed - ball.x_reftime), (ball.fy.closure)(self.elapsed - ball.y_reftime));
             ball.x = x.unwrap();
             ball.y = y.unwrap();
-            if ball.x < self.x1 || ball.x > self.x2 {
-                ball.hard_update_unchecked(&self.a, ball.get_x(), ball.get_y(), -ball.get_vx(self.elapsed) * ball.get_bounce(), ball.get_vy(self.elapsed), Recalculate::x(self.elapsed));
+            if ball.x - ball.radius < self.x1 {
+                let vx = ball.get_vx(self.elapsed); let vy = ball.get_vy(self.elapsed); let b = ball.get_bounce();
+                if vx < 0.0 {
+                    println!("ball {} had left x collision with x velocity {}, which will be reduced to {}", i, vx, -vx * b);
+                    ball.hard_update_unchecked(&self.a, ball.get_x(), ball.get_y(), -vx * b, vy, Recalculate::x(self.elapsed));
+                }
             }
-            if ball.y < self.floor {
-                ball.hard_update_unchecked(&self.a, ball.get_x(), ball.get_y(), ball.get_vx(self.elapsed), -ball.get_vy(self.elapsed) * ball.get_bounce(), Recalculate::y(self.elapsed));
+            if ball.x + ball.radius > self.x2 {
+                let vx = ball.get_vx(self.elapsed); let vy = ball.get_vy(self.elapsed); let b = ball.get_bounce();
+                if vx > 0.0 {
+                    println!("ball {} had right x collision with x velocity {}, which will be reduced to {}", i, vx, -vx * b);
+                    ball.hard_update_unchecked(&self.a, ball.get_x(), ball.get_y(), -vx * b, vy, Recalculate::x(self.elapsed));
+                }
+            }
+            if ball.y - ball.radius < self.floor {
+                let vx = ball.get_vx(self.elapsed); let vy = ball.get_vy(self.elapsed); let b = ball.get_bounce();
+                if vy < 0.0 {
+                    println!("ball {} had y collision with y velocity {}, which will be reduced to {}", i, vy, -vy * b);
+                    ball.hard_update_unchecked(&self.a, ball.get_x(), ball.get_y(), vx, -vy * b, Recalculate::y(self.elapsed));
+                }
             }
             ball.soft_update_unchecked();
+            i += 1;
         }
     }
 
