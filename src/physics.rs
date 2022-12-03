@@ -269,12 +269,10 @@ impl Space {
             ball.x = x.unwrap();
             ball.y = y.unwrap();
             if ball.x < self.x1 || ball.x > self.x2 {
-                // ball.cached_x_dyn_function = Some(ball.cached_x_dyn_function.as_ref().expect("No cache, unable to soft update!").flip(self.elapsed));
-                ball.hard_update_unchecked(&self.a, ball.get_x(), ball.get_y(), -ball.get_vx(self.elapsed), ball.get_vy(self.elapsed), Recalculate::x(self.elapsed));
+                ball.hard_update_unchecked(&self.a, ball.get_x(), ball.get_y(), -ball.get_vx(self.elapsed) * ball.get_bounce(), ball.get_vy(self.elapsed), Recalculate::x(self.elapsed));
             }
             if ball.y < self.floor {
-                // ball.cached_y_dyn_function = Some(ball.cached_y_dyn_function.as_ref().expect("No cache, unable to soft update!").flip(self.elapsed));
-                ball.hard_update_unchecked(&self.a, ball.get_x(), ball.get_y(), ball.get_vx(self.elapsed), -ball.get_vy(self.elapsed), Recalculate::y(self.elapsed));
+                ball.hard_update_unchecked(&self.a, ball.get_x(), ball.get_y(), ball.get_vx(self.elapsed), -ball.get_vy(self.elapsed) * ball.get_bounce(), Recalculate::y(self.elapsed));
             }
             ball.soft_update_unchecked();
         }
@@ -315,13 +313,13 @@ mod tests {
                 )
             )
         ); 
-        myspace.x1 = -20;
-        myspace.x2 = 20;
-        myspace.y1 = -10;
-        myspace.y2 = 30;
-        myspace.new_ball_unchecked(0.0, 25.0, 1.0, 1.0);
-        myspace.new_ball_unchecked(2.0, 13.0, 0.5, 0.5);
-        myspace.new_ball_unchecked(2.0, 16.0, 3.0, 5.0);
+        myspace.x1 = -20.0;
+        myspace.x2 = 20.0;
+        myspace.y1 = -10.0;
+        myspace.y2 = 30.0;
+        myspace.new_ball_unchecked(0.0, 25.0, 5.0, 5.0, 1.0, 1.0, 0.8, [1.0,0.0,0.0,1.0]);
+        myspace.new_ball_unchecked(2.0, 13.0, -5.0, -5.0, 0.5, 0.5, 0.5, [0.0,1.0,0.0,1.0]);
+        myspace.new_ball_unchecked(2.0, 16.0, 0.0, 0.0, 3.0, 5.0, 0.9, [0.0,0.0,1.0,1.0]);
 
         myspace.tick(1.0);
     }
