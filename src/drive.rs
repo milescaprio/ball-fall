@@ -1,25 +1,15 @@
 use super::kinematics;
 use graphics::Transformed;
-use kinematics::Function;
-use kinematics::SumFunction;
 use kinematics::Polynomial;
 use kinematics::Unit;
 use kinematics::Units;
 use kinematics::Var;
-use kinematics::EvalFunctionError;
 use kinematics::Monomial;
 use super::physics;
-use physics::Ball;
-use physics::Angle;
 use physics::Space;
 use physics::AccelxyFunction;
 use physics::GRAVITY_MPS2;
 use super::gl::Window;
-
-struct World {
-    space : Space,
-    window : Window,
-}
 
 pub fn shadowize(color : [f32; 4]) -> [f32; 4] {
     let mut ret = color;
@@ -38,7 +28,6 @@ pub fn bind(mut window : Window, mut space : Space, fps : u64, tps : u64) -> Win
     let floor_p_y = window.height as f64 + (space.floor as f64 - space.y1 as f64) * yscale;
 
     window.set_render_fn(Box::new(move |rtick, utick, c, gl| {
-        use graphics;
         space.tick(1.0 / tps as f32);
         graphics::clear([0.5, 0.75, 0.85, 1.0], gl); //sky blue
         graphics::rectangle([0.6,0.4,0.2,1.0],   [0.0, floor_p_y,       window.width as f64, window.height as f64 - floor_p_y], c.transform, gl);

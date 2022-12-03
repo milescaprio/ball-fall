@@ -3,6 +3,7 @@
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
+#![allow(dead_code)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum Var {
     T,
@@ -11,7 +12,7 @@ pub enum Var {
     S, //undirectional position
 }
 
-const UniqueUnits : usize = 3;
+const UNIQUE_UNIT_COUNT : usize = 3;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum Unit {
@@ -22,7 +23,7 @@ pub enum Unit {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Units {
-    pub exponents  : [i32; UniqueUnits]
+    pub exponents  : [i32; UNIQUE_UNIT_COUNT]
 }
 
 impl Unit {
@@ -36,12 +37,12 @@ impl Unit {
 impl Units {
     fn empty() -> Self {
         Units {
-            exponents : [0; UniqueUnits]
+            exponents : [0; UNIQUE_UNIT_COUNT]
         }
     }
     pub fn pow(&self, exp : i32) -> Units {
         let mut ret = Units::empty();
-        for i in 0..UniqueUnits {
+        for i in 0..UNIQUE_UNIT_COUNT {
             ret.exponents[i] = self.exponents[i] * exp;
         }
         ret
@@ -51,8 +52,8 @@ impl Units {
 impl std::ops::Mul for Units {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self {
-        let mut exponents = [0; UniqueUnits];
-        for i in 0..UniqueUnits {
+        let mut exponents = [0; UNIQUE_UNIT_COUNT];
+        for i in 0..UNIQUE_UNIT_COUNT {
             exponents[i] = self.exponents[i] + rhs.exponents[i];
         }
         Units {
@@ -64,8 +65,8 @@ impl std::ops::Mul for Units {
 impl std::ops::Div for Units {
     type Output = Self;
     fn div(self, rhs: Self) -> Self {
-        let mut exponents = [0; UniqueUnits];
-        for i in 0..UniqueUnits {
+        let mut exponents = [0; UNIQUE_UNIT_COUNT];
+        for i in 0..UNIQUE_UNIT_COUNT {
             exponents[i] = self.exponents[i] - rhs.exponents[i];
         }
         Units {
@@ -453,7 +454,6 @@ mod tests {
     #[test]
     fn construct_monomial() {
         let meter = Unit::M;
-        let meters = meter.units();
         let none = Units::empty();
         let slope = Monomial::init(2.0, none, 1);
         assert_eq!(slope.coefficient, 2.0);
@@ -516,20 +516,5 @@ mod tests {
         let polynomial = Polynomial::init(Var::X, meters, meters, vec![intercept, slope]);
         let integral = polynomial.integrated_c(Var::X, 0.0).unwrap();
         assert_eq!(integral.compile().unwrap()(1.0).unwrap(), 4.0);
-    }
-    #[test]
-    fn polynomial_shift() {
-        let meter = Unit::M;
-        let meters = meter.units();
-        let none = Units::empty();
-        let c = Monomial::init(6.0, meters, 0);
-        let b = Monomial::init(9.0, none, 1);
-        let a = Monomial::init(4.0, meters.pow(-1), 2);
-        let polynomial = Polynomial::init(Var::X, meters, meters, vec![c,b,a]);
-        let shifted = polynomial.shift_hor(-1.0);
-        shifted.debug();
-        assert_eq!(shifted.compile().unwrap()(1.0).unwrap(), 40.0);
-        //assert_eq!(shifted.compile().unwrap()(2.0).unwrap(), 74.0);
-        //vec![Monomial::init(4.0, meters.pow(-1), 0), Monomial::init(17.0, none, 1), Monomial::init(9.0, meters, 2)]);
     }
 }

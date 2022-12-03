@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 extern crate glutin_window;
 extern crate graphics;
 extern crate opengl_graphics;
@@ -25,20 +26,18 @@ pub struct Window {
     updatef : Option<Box<dyn FnMut(u64)>>,
 
 }
-fn print_type_of<T>(_: &T) {
-    println!("{}", std::any::type_name::<T>())
-}
+
 impl Window {
     
-    const FLAGLESS : u32 = 0;
-    const EXIT_ON_ESC : u32 = 0x1;
-    const RESIZABLE : u32 = 0x2;
-    const VSYNC : u32 = 0x4;
-    const DECORATED : u32 = 0x8;
-    const FULLSCREEN : u32 = 0x16;
-    const SRGB : u32 = 0x32;
-    const CONTROLLERS : u32 = 0x64;
-    const LAZY : u32 = 0x128;
+    pub const FLAGLESS : u32 = 0;
+    pub const EXIT_ON_ESC : u32 = 0x1;
+    pub const RESIZABLE : u32 = 0x2;
+    pub const VSYNC : u32 = 0x4;
+    pub const DECORATED : u32 = 0x8;
+    pub const FULLSCREEN : u32 = 0x16;
+    pub const SRGB : u32 = 0x32;
+    pub const CONTROLLERS : u32 = 0x64;
+    pub const LAZY : u32 = 0x128;
     pub const DEFAULT_FLAGS : u32 = Self::EXIT_ON_ESC | Self::RESIZABLE | Self::VSYNC | Self::DECORATED;
 
     pub fn new(width : usize, height : usize) -> Window {
@@ -57,7 +56,7 @@ impl Window {
             updatef : None,
         }
     }
-    pub fn begin(&mut self, title : String, FLAGS : u32) {
+    pub fn begin(&mut self, title : String, flags : u32) {
         //Begin the window by moving the cache to a active window on the screen
         //renderf and updatef should be set for the window's behavior
         self.window = Some(WindowSettings::new(
@@ -68,7 +67,7 @@ impl Window {
             .exit_on_esc(true)//FLAGS & Self::EXIT_ON_ESC != 0)
             .vsync(true)//FLAGS & Self::VSYNC != 0)
             .title(title)
-            .fullscreen(FLAGS & Self::FULLSCREEN != 0)
+            .fullscreen(flags & Self::FULLSCREEN != 0)
             .decorated(true)//FLAGS & Self::DECORATED != 0)
             //.controllers(FLAGS & Self::CONTROLLERS != 0)
             //.srgb(FLAGS & Self::SRGB != 0)
@@ -109,14 +108,12 @@ impl Window {
         Some(())
     }
     pub fn render(&mut self, args : &RenderArgs) {
-        use graphics;
         if let Some(f) = &mut self.renderf {
             self.gl.as_mut().expect("Window Not Initialized").draw(args.viewport(), |c, gl| {f(self.rtick, self.utick, c, gl)});
         }
         self.rtick += 1;
     }
     pub fn update(&mut self, args : &UpdateArgs) {
-        use graphics;
         if let Some(f) = &mut self.updatef {
             f(self.utick);
         }

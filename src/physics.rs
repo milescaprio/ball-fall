@@ -1,7 +1,7 @@
+#![allow(dead_code)]
 use super::kinematics;
 use kinematics::Function;
 use kinematics::SumFunction;
-use kinematics::Polynomial;
 use kinematics::Unit;
 use kinematics::Units;
 use kinematics::Var;
@@ -303,7 +303,7 @@ impl Space {
 #[cfg(test)]
 mod tests {
     use crate::kinematics::Monomial;
-
+    use crate::kinematics::Polynomial;
     use super::*;
     #[test]
     fn gravity_space() {
