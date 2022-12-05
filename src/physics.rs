@@ -66,7 +66,8 @@ pub struct Ball {
     y: f32,
     radius: f32,
     mass: f32,
-    bounce: f32,
+    ground_bounce: f32,
+    free_bounce: f32,
     fx: FunctionCache, //respect to time
     fy: FunctionCache,
     cached_x_dyn_function : Option<Box<dyn Function>>,
@@ -189,15 +190,105 @@ impl Ball {
             }
         }
     }
-     fn new_v2p(m1 : f32, m2 : f32, v1 : f32, v2 : f32) -> f32 {
-        2.0*m1*v1/(m1+m2) - (m1-m2)/(m1+m2)*v2
+    pub fn hard_update(&mut self, a_ref : &AccelxyFunction, xi : f32, yi : f32, vxi : f32, vyi : f32, t : Recalculate) {
+        //todo: make this checked, finish hard_update_unchecked, and start to prefer the checked versions
+        self.hard_update_unchecked(a_ref, xi, yi, vxi, vyi, t);
     }
-    fn new_v1(m1 : f32, m2 : f32, v1 : f32, v2 : f32) -> f32 {
-        2.0*m2*v2/(m1+m2) + (m1-m2)/(m1+m2)*v1
+
+
+
+
+    fn collision_vs(m1 : f32, m2 : f32, v1 : f32, v2 : f32) -> (f32,f32) {
+        //calculates exit velocities of two objects colliding in one dimension
+        (2.0*m1*v1/(m1+m2) - (m1-m2)/(m1+m2)*v2, 2.0*m2*v2/(m1+m2) + (m1-m2)/(m1+m2)*v1)
     }
-    pub fn collide(&mut self, &mut other : Ball) {
+    pub fn collide(&mut self, other : &mut Ball, t : f32) {
+        //take two balls and bounce them from each other, assuming they are touching
         
+        //find angle measures of the two balls
+        let (b1vx, b1vy, b2vx, b2vy) = (self.get_vx(t), self.get_vy(t), other.get_vx(t), other.get_vy(t));
+        let (b1v, b2v) = (b1vx.hypot(b1vy), b2vx.hypot(b2vy)); //pythagorean theorem, v magnitude
+        let ball_centers_angle = (other.y-self.y).atan2(other.x-self.x); //gets direction of centers from self to other (b1 to b2)
+        let b1_v_angle = b1vy.atan2(b1vx);
+        let b2_v_angle = b2vy.atan2(b2vx);
+        let b1_v_angle_relative = b1_v_angle - ball_centers_angle;
+        let b2_v_angle_relative = b2_v_angle - ball_centers_angle;
+        
+        //find final velocities along this axis
+        let (b1vr, b2vr) = (b1v * b1_v_angle_relative.cos(), b2v * b2_v_angle_relative.cos()); //velocities on collision axis
+        let (b1vr_f, b2vr_f) = Self::collision_vs(self.mass, other.mass, b1vr , b2vr);
+        let (b1vr_fb, b2vr_fb) = (b1vr_f * self.free_bounce, b2vr_f * other.free_bounce); //apply bounce coefficients
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+
+
+
+
+
+
+
+        b1_v_angle_relative, b2_v_angle_relative
     }
+    
+    
+    
+    
+    
+    
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+
+
+
+
+
     pub fn get_x(&self) -> f32 {
         self.x
     }
@@ -210,8 +301,11 @@ impl Ball {
     pub fn get_mass(&self) -> f32 {
         self.mass
     }
-    pub fn get_bounce(&self) -> f32 {
-        self.bounce
+    pub fn get_ground_bounce(&self) -> f32 {
+        self.ground_bounce
+    }
+    pub fn get_free_bounce(&self) -> f32 {
+        self.free_bounce
     }
     pub fn get_color(&self) -> [f32; 4] {
         self.color
@@ -257,14 +351,19 @@ impl Space {
         }
     }
 
-    pub fn new_ball_unchecked(&mut self, x : f32, y : f32, vxi : f32, vyi : f32, r : f32, m : f32, b : f32, color : [f32; 4]) {
+    pub fn new_ball_unchecked(&mut self, x : f32, y : f32, vxi : f32, vyi : f32, r : f32, m : f32, b_g : f32, b_f : f32, color : [f32; 4]) {
+        //creates a new ball in the space with given parameters including starting location, velocity,
+        //and radius, mass,
+        //ground bounce coefficient (applied to absolute value of velocity when hitting ground or wall), 
+        //and free bounce coefficient (applied to change in velocity when hitting another ball)
         let mut ret = Ball::default();
         ret.x = x;
         ret.y = y;
         ret.radius = r;
         ret.mass = m;
         ret.color = color;
-        ret.bounce = b;
+        ret.ground_bounce = b_g;
+        ret.free_bounce = b_f;
         ret.hard_update_unchecked(&self.a, ret.x, ret.y, vxi, vyi, Recalculate::xy(0.0,0.0));
         self.balls.push(ret);
     }

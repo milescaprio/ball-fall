@@ -94,11 +94,11 @@ pub fn world1() {
     myspace.x2 = 50.0;
     myspace.y1 = -20.0;
     myspace.y2 = 30.0;
-    myspace.new_ball_unchecked(0.0, 25.0, -35.0, 2.0, 1.0, 1.0, 0.8, [1.0, 0.0, 0.0, 1.0]);
-    myspace.new_ball_unchecked(2.0, 13.0, 5.0, -10.0, 0.5, 0.5, 0.8, [0.0, 1.0, 0.0, 1.0]);
-    myspace.new_ball_unchecked(4.0, 16.0, 10.0, -5.0, 3.0, 5.0, 0.8, [0.0, 0.0, 1.0, 1.0]);
-    myspace.new_ball_unchecked(40.0, 27.0, 100.0, -50.0, 15.0, 5.0, 0.9999999, [0.1, 0.95, 1.0, 0.5]);
-    myspace.new_ball_unchecked(0.0, 10.0, 15.0 ,15.0, 5.0, 1.0, 1.1, [0.9,0.01,0.4,1.0]);
+    myspace.new_ball_unchecked(0.0, 25.0, -35.0, 2.0, 1.0, 1.0, 0.8, 0.95, [1.0, 0.0, 0.0, 1.0]);
+    myspace.new_ball_unchecked(2.0, 13.0, 5.0, -10.0, 0.5, 0.5, 0.8, 0.95, [0.0, 1.0, 0.0, 1.0]);
+    myspace.new_ball_unchecked(4.0, 16.0, 10.0, -5.0, 3.0, 5.0, 0.8, 0.95, [0.0, 0.0, 1.0, 1.0]);
+    myspace.new_ball_unchecked(40.0, 27.0, 100.0, -50.0, 15.0, 5.0, 0.95, 0.9999999, [0.1, 0.95, 1.0, 0.5]);
+    myspace.new_ball_unchecked(0.0, 10.0, 15.0 ,15.0, 5.0, 1.0, 1.1, 0.95, [0.9,0.01,0.4,1.0]);
     let mut mywindow = Window::new(1024,1024);
     let mut boundwindow = bind(mywindow, myspace, 165, 165);
     boundwindow.begin(String::from("Beautiful balls"), Window::DEFAULT_FLAGS);
