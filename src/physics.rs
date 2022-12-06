@@ -233,7 +233,16 @@ impl Ball {
         other.hard_update(other.x, other.y, b2vy_fb, b2vy_fb);
     }
     pub fn search_collisions_pairs(&self) -> Vec<(usize, usize)> {
-        //O(n^2)) function finding colliding balls
+        //O(n^2)) function searching for colliding balls with pythagorean theorem and two for loops
+        let mut ret = Vec::<(usize, usize)>::new();
+        for i in 0..(self.balls.len()-1) {
+            for j in (i+1)..self.balls.len() {
+                if (self.balls[i].x - self.balls[j].x) * (self.balls[i].x - self.balls[j].x) + (self.balls[i].y - self.balls[j].y) * (self.balls[i].y - self.balls[j].y) <= self.balls[i].radius + self.balls[j].radius {
+                    ret.push((i,j));
+                }
+            }
+        }
+        ret
     }
     
     
