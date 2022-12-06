@@ -219,6 +219,11 @@ impl Ball {
         let (b1vr_f, b2vr_f) = Self::collision_vs(self.mass, other.mass, b1vr , b2vr);
         let (b1vr_fb, b2vr_fb) = (b1vr_f * self.free_bounce, b2vr_f * other.free_bounce); //apply bounce coefficients
         
+        //rotate back to original axis
+        let (b1vx_fb, b1vy_fb) = b1vr_fb * ball_centers_angle.cos()????, b1vr_fb 
+        //1st step: convert 
+
+        //acctually maybe add in others first? the perpendiculars
         
         
         
