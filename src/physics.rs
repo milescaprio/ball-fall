@@ -205,64 +205,35 @@ impl Ball {
     pub fn collide(&mut self, other : &mut Ball, t : f32) {
         //take two balls and bounce them from each other, assuming they are touching
         
-        //find angle measures of the two balls
-        let (b1vx, b1vy, b2vx, b2vy) = (self.get_vx(t), self.get_vy(t), other.get_vx(t), other.get_vy(t));
+        //fetch initial velocities
+        let (b1vx, b1vy, b2vx, b2vy) = (self.get_vx(t), self.get_vy(t), other.get_vx(t), other.get_vy(t)); 
         let (b1v, b2v) = (b1vx.hypot(b1vy), b2vx.hypot(b2vy)); //pythagorean theorem, v magnitude
-        let ball_centers_angle = (other.y-self.y).atan2(other.x-self.x); //gets direction of centers from self to other (b1 to b2)
-        let b1_v_angle = b1vy.atan2(b1vx);
-        let b2_v_angle = b2vy.atan2(b2vx);
-        let b1_v_angle_relative = b1_v_angle - ball_centers_angle;
-        let b2_v_angle_relative = b2_v_angle - ball_centers_angle;
-        
-        //find final velocities along this axis
-        let (b1vr, b2vr) = (b1v * b1_v_angle_relative.cos(), b2v * b2_v_angle_relative.cos()); //velocities on collision axis
-        let (b1vr_f, b2vr_f) = Self::collision_vs(self.mass, other.mass, b1vr , b2vr);
-        let (b1vr_fb, b2vr_fb) = (b1vr_f * self.free_bounce, b2vr_f * other.free_bounce); //apply bounce coefficients
-        
-        //rotate back to original axis
-        let (b1vx_fb, b1vy_fb) = b1vr_fb * ball_centers_angle.cos()????, b1vr_fb 
-        //1st step: convert 
 
-        //acctually maybe add in others first? the perpendiculars
+        //calculate velocity angles
+        let collision_angle = (other.y-self.y).atan2(other.x-self.x); //gets direction of centers from b1 to b2
+        let (b1v_angle   , b2v_angle   ) = (b1vy.atan2(b1vx), b2vy.atan2(b2vx));
+        let (b1v_angle_ll, b2v_angle_ll) = (b1v_angle - collision_angle, b2v_angle - collision_angle); //ll represents parellel to collision axis
         
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
+        //find velocities along collision axis
+        let (b1vll, b2vll) = (b1v * b1v_angle_ll.cos(), b2v * b2v_angle_ll.cos()); //velocities on collision axis, ll represents parellel
+        let (b1vL , b2vL ) = (b1v * b1v_angle_ll.sin(), b2v * b2v_angle_ll.sin()); //velocities off collision axis, L represents perpendicular
 
+        //collide balls
+        let (b1vll_f , b2vll_f ) = Self::collision_vs(self.mass, other.mass, b1vr , b2vr); //f means final
+        let (b1vll_fb, b2vll_fb) = (b1vll_f * self.free_bounce, b2vll_f * other.free_bounce); //apply bounce coefficients, b means bounce
+        
+        //calculate new total velocities and their angles
+        let (b1v_fb_angle_ll, b2v_fb_angle_ll) = (b1vL.atan2(b1vll), b2vL.atan2(b2vll));
+        let (b1v_fb_angle   , b2v_fb_angle   ) = (b1v_fb_angle + collision_angle, b2V_fb_angle + collision_angle);
+        let (b1v_fb, b2v_fb) = (b1vll_fb.hypot(b1vL), b2vll_fb.hypot(b2vL));
 
-
-
-
-
-
-        b1_v_angle_relative, b2_v_angle_relative
+        //calculate x and y components and put back into ball
+        let (b1vx_fb, b1vy_fb, b2xv_fb, b2vy_fb) = (b1v_fb * b1v_fb_angle.cos(), b1v_fb * b1v_fb_angle.sin(), b2v_fv * b2v_fb_angle.cos(), b2v_fb * b2v_fb_angle.sin());
+        self .hard_update(self.x , self.y , b1vx_fb, b1vy_fb);
+        other.hard_update(other.x, other.y, b2vy_fb, b2vy_fb);
+    }
+    pub fn search_collisions_pairs(&self) -> Vec<(usize, usize)> {
+        //O(n^2)) function finding colliding balls
     }
     
     
@@ -405,6 +376,10 @@ impl Space {
             }
             ball.soft_update_unchecked();
             i += 1;
+        }
+        for pair in self.search_collision_pairs() {
+            println!("ball {} had collisions with ball {}", pair.0, pair.1);
+            self.balls[pair.0].collide(&mut self.balls[pair.1]);
         }
     }
 
