@@ -6,7 +6,7 @@ use kinematics::Unit;
 use kinematics::Units;
 use kinematics::Var;
 use kinematics::EvalFunctionError;
-pub const GRAVITY_MPS2: f32 = -100.81;
+pub const GRAVITY_MPS2: f32 = -9.81;
 
 struct FunctionCache {
     pub closure: Box<dyn Fn(f32) -> Result<f32, EvalFunctionError>>,
@@ -48,9 +48,9 @@ impl Recalculate {
             val : (MaybeNew::NoUpdate, MaybeNew::Update(t)),
         }
     }
-    pub fn xy(t : f32, u : f32) -> Self {
+    pub fn xy(tx : f32, ty : f32) -> Self {
         Self {
-            val : (MaybeNew::Update(t), MaybeNew::Update(u)),
+            val : (MaybeNew::Update(tx), MaybeNew::Update(ty)),
         }
     }
     pub fn no_update() -> Self {
@@ -193,87 +193,7 @@ impl Ball {
     pub fn hard_update(&mut self, a_ref : &AccelxyFunction, xi : f32, yi : f32, vxi : f32, vyi : f32, t : Recalculate) {
         //todo: make this checked, finish hard_update_unchecked, and start to prefer the checked versions
         self.hard_update_unchecked(a_ref, xi, yi, vxi, vyi, t);
-    }
-
-
-
-
-    fn collision_vs(m1 : f32, m2 : f32, v1 : f32, v2 : f32) -> (f32,f32) {
-        //calculates exit velocities of two objects colliding in one dimension
-        (2.0*m1*v1/(m1+m2) - (m1-m2)/(m1+m2)*v2, 2.0*m2*v2/(m1+m2) + (m1-m2)/(m1+m2)*v1)
-    }
-    pub fn collide(&mut self, other : &mut Ball, t : f32) {
-        //take two balls and bounce them from each other, assuming they are touching
-        
-        //fetch initial velocities
-        let (b1vx, b1vy, b2vx, b2vy) = (self.get_vx(t), self.get_vy(t), other.get_vx(t), other.get_vy(t)); 
-        let (b1v, b2v) = (b1vx.hypot(b1vy), b2vx.hypot(b2vy)); //pythagorean theorem, v magnitude
-
-        //calculate velocity angles
-        let collision_angle = (other.y-self.y).atan2(other.x-self.x); //gets direction of centers from b1 to b2
-        let (b1v_angle   , b2v_angle   ) = (b1vy.atan2(b1vx), b2vy.atan2(b2vx));
-        let (b1v_angle_ll, b2v_angle_ll) = (b1v_angle - collision_angle, b2v_angle - collision_angle); //ll represents parellel to collision axis
-        
-        //find velocities along collision axis
-        let (b1vll, b2vll) = (b1v * b1v_angle_ll.cos(), b2v * b2v_angle_ll.cos()); //velocities on collision axis, ll represents parellel
-        let (b1vL , b2vL ) = (b1v * b1v_angle_ll.sin(), b2v * b2v_angle_ll.sin()); //velocities off collision axis, L represents perpendicular
-
-        //collide balls
-        let (b1vll_f , b2vll_f ) = Self::collision_vs(self.mass, other.mass, b1vr , b2vr); //f means final
-        let (b1vll_fb, b2vll_fb) = (b1vll_f * self.free_bounce, b2vll_f * other.free_bounce); //apply bounce coefficients, b means bounce
-        
-        //calculate new total velocities and their angles
-        let (b1v_fb_angle_ll, b2v_fb_angle_ll) = (b1vL.atan2(b1vll), b2vL.atan2(b2vll));
-        let (b1v_fb_angle   , b2v_fb_angle   ) = (b1v_fb_angle + collision_angle, b2V_fb_angle + collision_angle);
-        let (b1v_fb, b2v_fb) = (b1vll_fb.hypot(b1vL), b2vll_fb.hypot(b2vL));
-
-        //calculate x and y components and put back into ball
-        let (b1vx_fb, b1vy_fb, b2xv_fb, b2vy_fb) = (b1v_fb * b1v_fb_angle.cos(), b1v_fb * b1v_fb_angle.sin(), b2v_fv * b2v_fb_angle.cos(), b2v_fb * b2v_fb_angle.sin());
-        self .hard_update(self.x , self.y , b1vx_fb, b1vy_fb);
-        other.hard_update(other.x, other.y, b2vy_fb, b2vy_fb);
-    }
-    pub fn search_collisions_pairs(&self) -> Vec<(usize, usize)> {
-        //O(n^2)) function searching for colliding balls with pythagorean theorem and two for loops
-        let mut ret = Vec::<(usize, usize)>::new();
-        for i in 0..(self.balls.len()-1) {
-            for j in (i+1)..self.balls.len() {
-                if (self.balls[i].x - self.balls[j].x) * (self.balls[i].x - self.balls[j].x) + (self.balls[i].y - self.balls[j].y) * (self.balls[i].y - self.balls[j].y) <= self.balls[i].radius + self.balls[j].radius {
-                    ret.push((i,j));
-                }
-            }
-        }
-        ret
-    }
-    
-    
-    
-    
-    
-    
-
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
-
-
-
-
-
+    } 
     pub fn get_x(&self) -> f32 {
         self.x
     }
@@ -353,6 +273,69 @@ impl Space {
         self.balls.push(ret);
     }
 
+    fn two_mut_vals_in_container<T>(container : &mut Vec<T>, mut i1 : usize, mut i2 : usize) -> (&mut T, &mut T) {
+        if i1 > i2 {
+            (i1,i2) = (i2,i1);
+        }
+        if i1 == i2 {
+            panic!("be the same");
+        }
+        let first_split = container.split_at_mut(i1 + 1);
+        let second_split = first_split.1.split_at_mut(i2 - i1 - 1);
+        // first_split.0[0] = v1;
+        // second_split.1[0] = v2;
+        (&mut first_split.0[0], &mut second_split.1[0])
+    }
+    fn collision_vs(m1 : f32, m2 : f32, v1 : f32, v2 : f32) -> (f32,f32) {
+        //calculates exit velocities of two objects colliding in one dimension
+        (2.0*m2*v2/(m1+m2) + (m1-m2)/(m1+m2)*v1, 2.0*m1*v1/(m1+m2) - (m1-m2)/(m1+m2)*v2)
+    }
+    pub fn collide(&mut self, i : usize, j : usize) {
+        //take two balls and bounce them from each other, assuming they are touching
+        
+        let (mut b1, mut b2) = Self::two_mut_vals_in_container::<Ball>(&mut self.balls, i, j);
+        
+        //fetch initial velocities
+        let (b1vx, b1vy, b2vx, b2vy) = (b1.get_vx(self.elapsed), b1.get_vy(self.elapsed), b2.get_vx(self.elapsed), b2.get_vy(self.elapsed)); 
+        let (b1v, b2v) = (b1vx.hypot(b1vy), b2vx.hypot(b2vy)); //pythagorean theorem, v magnitude
+
+        //calculate velocity angles
+        let collision_angle = (b2.y-b1.y).atan2(b2.x-b1.x); //gets direction of centers from b1 to b2
+        let (b1v_angle   , b2v_angle   ) = (b1vy.atan2(b1vx), b2vy.atan2(b2vx));
+        let (b1v_angle_ll, b2v_angle_ll) = (b1v_angle - collision_angle, b2v_angle - collision_angle); //ll represents parellel to collision axis
+        
+        //find velocities along collision axis
+        let (b1vll, b2vll) = (b1v * b1v_angle_ll.cos(), b2v * b2v_angle_ll.cos()); //velocities on collision axis, ll represents parellel
+        let (b1vL , b2vL ) = (b1v * b1v_angle_ll.sin(), b2v * b2v_angle_ll.sin()); //velocities off collision axis, L represents perpendicular
+
+        //collide balls
+        let (b1vll_f , b2vll_f ) = Self::collision_vs(b1.mass, b2.mass, b1vll , b2vll); //f means final
+        let (b1vll_fb, b2vll_fb) = (b1vll_f * b1.free_bounce, b2vll_f * b2.free_bounce); //apply bounce coefficients, b means bounce
+        
+        //calculate new total velocities and their angles
+        let (b1v_fb_angle_ll, b2v_fb_angle_ll) = (b1vL.atan2(b1vll), b2vL.atan2(b2vll));
+        let (b1v_fb_angle   , b2v_fb_angle   ) = (b1v_fb_angle_ll + collision_angle, b2v_fb_angle_ll + collision_angle);
+        let (b1v_fb, b2v_fb) = (b1vll_fb.hypot(b1vL), b2vll_fb.hypot(b2vL));
+
+        //calculate x and y components and put back into ball
+        let (b1vx_fb, b1vy_fb, b2vx_fb, b2vy_fb) = (b1v_fb * b1v_fb_angle.cos(), b1v_fb * b1v_fb_angle.sin(), b2v_fb * b2v_fb_angle.cos(), b2v_fb * b2v_fb_angle.sin());
+        b1.hard_update(&self.a, b1.x, b1.y, b1vx_fb, b1vy_fb, Recalculate::xy(self.elapsed, self.elapsed));
+        b2.hard_update(&self.a, b2.x, b2.y, b2vx_fb, b2vy_fb, Recalculate::xy(self.elapsed, self.elapsed));
+    }
+
+    pub fn search_collision_pairs(&self) -> Vec<(usize, usize)> {
+        //O(n^2)) function searching for colliding balls with pythagorean theorem and two for loops
+        let mut ret = Vec::<(usize, usize)>::new();
+        for i in 0..(self.balls.len()-1) {
+            for j in (i+1)..self.balls.len() {
+                if (self.balls[i].x - self.balls[j].x) * (self.balls[i].x - self.balls[j].x) + (self.balls[i].y - self.balls[j].y) * (self.balls[i].y - self.balls[j].y) <= self.balls[i].radius + self.balls[j].radius {
+                    ret.push((i,j));
+                }
+            }
+        }
+        ret
+    }
+
     pub fn tick(&mut self, dt: f32) {
         self.elapsed += dt;
         let mut i = 0;
@@ -363,21 +346,21 @@ impl Space {
             ball.x = x.unwrap();
             ball.y = y.unwrap();
             if ball.x - ball.radius < self.x1 {
-                let vx = ball.get_vx(self.elapsed); let vy = ball.get_vy(self.elapsed); let b = ball.get_bounce();
+                let vx = ball.get_vx(self.elapsed); let vy = ball.get_vy(self.elapsed); let b = ball.get_ground_bounce();
                 if vx < 0.0 {
                     println!("ball {} had left x collision with x velocity {}, which will be reduced to {}", i, vx, -vx * b);
                     ball.hard_update_unchecked(&self.a, ball.get_x(), ball.get_y(), -vx * b, vy, Recalculate::x(self.elapsed));
                 }
             }
             if ball.x + ball.radius > self.x2 {
-                let vx = ball.get_vx(self.elapsed); let vy = ball.get_vy(self.elapsed); let b = ball.get_bounce();
+                let vx = ball.get_vx(self.elapsed); let vy = ball.get_vy(self.elapsed); let b = ball.get_ground_bounce();
                 if vx > 0.0 {
                     println!("ball {} had right x collision with x velocity {}, which will be reduced to {}", i, vx, -vx * b);
                     ball.hard_update_unchecked(&self.a, ball.get_x(), ball.get_y(), -vx * b, vy, Recalculate::x(self.elapsed));
                 }
             }
             if ball.y - ball.radius < self.floor {
-                let vx = ball.get_vx(self.elapsed); let vy = ball.get_vy(self.elapsed); let b = ball.get_bounce();
+                let vx = ball.get_vx(self.elapsed); let vy = ball.get_vy(self.elapsed); let b = ball.get_ground_bounce();
                 if vy < 0.0 {
                     println!("ball {} had y collision with y velocity {}, which will be reduced to {}", i, vy, -vy * b);
                     ball.hard_update_unchecked(&self.a, ball.get_x(), ball.get_y(), vx, -vy * b, Recalculate::y(self.elapsed));
@@ -388,7 +371,7 @@ impl Space {
         }
         for pair in self.search_collision_pairs() {
             println!("ball {} had collisions with ball {}", pair.0, pair.1);
-            self.balls[pair.0].collide(&mut self.balls[pair.1]);
+            self.collide(pair.0, pair.1);
         }
     }
 
@@ -403,7 +386,7 @@ mod tests {
     use crate::kinematics::Polynomial;
     use super::*;
     #[test]
-    fn gravity_space() {
+    fn gravity_space_collision() {
         let mps2 : Units = Unit::M.units() / Unit::S.units() / Unit::S.units();
         let noaccel = Monomial::init(0.0, mps2, 0);
         let g = Monomial::init(GRAVITY_MPS2, mps2, 0);
@@ -431,10 +414,28 @@ mod tests {
         myspace.x2 = 20.0;
         myspace.y1 = -10.0;
         myspace.y2 = 30.0;
-        myspace.new_ball_unchecked(0.0, 25.0, 5.0, 5.0, 1.0, 1.0, 0.8, [1.0,0.0,0.0,1.0]);
-        myspace.new_ball_unchecked(2.0, 13.0, -5.0, -5.0, 0.5, 0.5, 0.5, [0.0,1.0,0.0,1.0]);
-        myspace.new_ball_unchecked(2.0, 16.0, 0.0, 0.0, 3.0, 5.0, 0.9, [0.0,0.0,1.0,1.0]);
+        // myspace.new_ball_unchecked(0.0, 25.0, 5.0, 5.0, 1.0, 1.0, 0.8, 0.99, [1.0,0.0,0.0,1.0]);
+        // myspace.new_ball_unchecked(2.0, 13.0, -5.0, -5.0, 0.5, 0.5, 0.5, 0.99,[0.0,1.0,0.0,1.0]);
+        // myspace.new_ball_unchecked(2.0, 16.0, 0.0, 0.0, 3.0, 5.0, 0.9, 0.99, [0.0,0.0,1.0,1.0]);
 
-        myspace.tick(1.0);
+        // myspace.tick(1.0);
+
+        dbg!(Space::collision_vs(1.0, 1.5, -1.0, 1.0));
+
+        myspace.new_ball_unchecked(10.0, 10.0,  1.0,  0.0, 1.0, 1.0, 1.0, 1.0, [1.0,1.0,1.0,1.0]);
+        myspace.new_ball_unchecked(12.0, 10.0, -1.0, 0.0, 1.0, 1.0, 1.0, 1.0, [1.0,1.0,1.0,1.0]);
+        myspace.collide(0, 1);
+        dbg!(myspace.balls[0].get_vx(0.0));
+        dbg!(myspace.balls[0].get_vy(0.0));
+        dbg!(myspace.balls[1].get_vx(0.0));
+        dbg!(myspace.balls[1].get_vy(0.0));
+
+        // myspace.new_ball_unchecked(7.828, 7.828, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0, [1.0,1.0,1.0,1.0]);
+        // myspace.new_ball_unchecked(5.0, 5.0, 1.0, 1.0, 1.0, 1.5, 1.0, 1.0, [1.0,1.0,1.0,1.0]);
+        // myspace.collide(2, 3);
+        // dbg!(myspace.balls[2].get_vx(0.1));
+        // dbg!(myspace.balls[2].get_vy(0.1));
+        // dbg!(myspace.balls[3].get_vx(0.1));
+        // dbg!(myspace.balls[3].get_vy(0.1));
     }
 }
