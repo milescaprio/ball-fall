@@ -6,7 +6,7 @@ use kinematics::Unit;
 use kinematics::Units;
 use kinematics::Var;
 use kinematics::EvalFunctionError;
-pub const GRAVITY_MPS2: f32 = -9.81;
+pub const GRAVITY_MPS2: f32 = -100.81;
 
 struct FunctionCache {
     pub closure: Box<dyn Fn(f32) -> Result<f32, EvalFunctionError>>,
@@ -256,6 +256,18 @@ impl Space {
         }
     }
 
+    pub fn debug_velocities(&self) {
+        for i in 0..self.balls.len() {
+            println!("Ball {} has velocity ({}, {})", i, self.balls[i].get_vx(self.elapsed), self.balls[i].get_vy(self.elapsed));
+        }
+    }
+
+    pub fn debug_positions(&self) {
+        for i in 0..self.balls.len() {
+            println!("Ball {} has position ({}, {})", i, self.balls[i].x, self.balls[i].y);
+        }
+    }
+
     pub fn new_ball_unchecked(&mut self, x : f32, y : f32, vxi : f32, vyi : f32, r : f32, m : f32, b_g : f32, b_f : f32, color : [f32; 4]) {
         //creates a new ball in the space with given parameters including starting location, velocity,
         //and radius, mass,
@@ -299,26 +311,32 @@ impl Space {
         let (b1vx, b1vy, b2vx, b2vy) = (b1.get_vx(self.elapsed), b1.get_vy(self.elapsed), b2.get_vx(self.elapsed), b2.get_vy(self.elapsed)); 
         let (b1v, b2v) = (b1vx.hypot(b1vy), b2vx.hypot(b2vy)); //pythagorean theorem, v magnitude
 
-        //calculate velocity angles
-        let collision_angle = (b2.y-b1.y).atan2(b2.x-b1.x); //gets direction of centers from b1 to b2
-        let (b1v_angle   , b2v_angle   ) = (b1vy.atan2(b1vx), b2vy.atan2(b2vx));
-        let (b1v_angle_ll, b2v_angle_ll) = (b1v_angle - collision_angle, b2v_angle - collision_angle); //ll represents parellel to collision axis
+        //calculate velocity θs
+        let collision_θ = (b2.y-b1.y).atan2(b2.x-b1.x); //gets direction of centers from b1 to b2
+        let (b1v_θ   , b2v_θ   ) = (b1vy.atan2(b1vx), b2vy.atan2(b2vx));
+        let (b1v_θ_ll, b2v_θ_ll) = (b1v_θ - collision_θ, b2v_θ - collision_θ); //ll represents parellel to collision axis
         
         //find velocities along collision axis
-        let (b1vll, b2vll) = (b1v * b1v_angle_ll.cos(), b2v * b2v_angle_ll.cos()); //velocities on collision axis, ll represents parellel
-        let (b1vL , b2vL ) = (b1v * b1v_angle_ll.sin(), b2v * b2v_angle_ll.sin()); //velocities off collision axis, L represents perpendicular
+        let (b1vll, b2vll) = (b1v * b1v_θ_ll.cos(), b2v * b2v_θ_ll.cos()); //velocities on collision axis, ll represents parellel
+        let (b1vL , b2vL ) = (b1v * b1v_θ_ll.sin(), b2v * b2v_θ_ll.sin()); //velocities off collision axis, L represents perpendicular
+
+        // if (!(b1vll > 0.0 && b2vll < 0.0 && b1vll.abs() <= b2vll.abs())) {
+        //     return; //no collision, they aren't exerting force;
+        // }
 
         //collide balls
         let (b1vll_f , b2vll_f ) = Self::collision_vs(b1.mass, b2.mass, b1vll , b2vll); //f means final
         let (b1vll_fb, b2vll_fb) = (b1vll_f * b1.free_bounce, b2vll_f * b2.free_bounce); //apply bounce coefficients, b means bounce
         
-        //calculate new total velocities and their angles
-        let (b1v_fb_angle_ll, b2v_fb_angle_ll) = (b1vL.atan2(b1vll), b2vL.atan2(b2vll));
-        let (b1v_fb_angle   , b2v_fb_angle   ) = (b1v_fb_angle_ll + collision_angle, b2v_fb_angle_ll + collision_angle);
+        //calculate new total velocities and their θs
+        let (b1v_fb_θ_ll, b2v_fb_θ_ll) = (b1vL.atan2(b1vll_fb), b2vL.atan2(b2vll_fb));
+        let (b1v_fb_θ   , b2v_fb_θ   ) = (b1v_fb_θ_ll + collision_θ, b2v_fb_θ_ll + collision_θ);
         let (b1v_fb, b2v_fb) = (b1vll_fb.hypot(b1vL), b2vll_fb.hypot(b2vL));
 
+
+
         //calculate x and y components and put back into ball
-        let (b1vx_fb, b1vy_fb, b2vx_fb, b2vy_fb) = (b1v_fb * b1v_fb_angle.cos(), b1v_fb * b1v_fb_angle.sin(), b2v_fb * b2v_fb_angle.cos(), b2v_fb * b2v_fb_angle.sin());
+        let (b1vx_fb, b1vy_fb, b2vx_fb, b2vy_fb) = (b1v_fb * b1v_fb_θ.cos(), b1v_fb * b1v_fb_θ.sin(), b2v_fb * b2v_fb_θ.cos(), b2v_fb * b2v_fb_θ.sin());
         b1.hard_update(&self.a, b1.x, b1.y, b1vx_fb, b1vy_fb, Recalculate::xy(self.elapsed, self.elapsed));
         b2.hard_update(&self.a, b2.x, b2.y, b2vx_fb, b2vy_fb, Recalculate::xy(self.elapsed, self.elapsed));
     }
@@ -328,7 +346,8 @@ impl Space {
         let mut ret = Vec::<(usize, usize)>::new();
         for i in 0..(self.balls.len()-1) {
             for j in (i+1)..self.balls.len() {
-                if (self.balls[i].x - self.balls[j].x) * (self.balls[i].x - self.balls[j].x) + (self.balls[i].y - self.balls[j].y) * (self.balls[i].y - self.balls[j].y) <= self.balls[i].radius + self.balls[j].radius {
+                //if (self.balls[i].x - self.balls[j].x) * (self.balls[i].x - self.balls[j].x) + (self.balls[i].y - self.balls[j].y) * (self.balls[i].y - self.balls[j].y) <= self.balls[i].radius + self.balls[j].radius {
+                if (self.balls[i].x - self.balls[j].x).hypot(self.balls[i].y - self.balls[j].y) <= self.balls[i].radius + self.balls[j].radius {
                     ret.push((i,j));
                 }
             }
@@ -424,18 +443,14 @@ mod tests {
 
         myspace.new_ball_unchecked(10.0, 10.0,  1.0,  0.0, 1.0, 1.0, 1.0, 1.0, [1.0,1.0,1.0,1.0]);
         myspace.new_ball_unchecked(12.0, 10.0, -1.0, 0.0, 1.0, 1.0, 1.0, 1.0, [1.0,1.0,1.0,1.0]);
+        myspace.debug_velocities();
+        myspace.debug_positions();
         myspace.collide(0, 1);
-        dbg!(myspace.balls[0].get_vx(0.0));
-        dbg!(myspace.balls[0].get_vy(0.0));
-        dbg!(myspace.balls[1].get_vx(0.0));
-        dbg!(myspace.balls[1].get_vy(0.0));
+        myspace.debug_velocities();
+        myspace.debug_positions();
 
         // myspace.new_ball_unchecked(7.828, 7.828, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0, [1.0,1.0,1.0,1.0]);
         // myspace.new_ball_unchecked(5.0, 5.0, 1.0, 1.0, 1.0, 1.5, 1.0, 1.0, [1.0,1.0,1.0,1.0]);
         // myspace.collide(2, 3);
-        // dbg!(myspace.balls[2].get_vx(0.1));
-        // dbg!(myspace.balls[2].get_vy(0.1));
-        // dbg!(myspace.balls[3].get_vx(0.1));
-        // dbg!(myspace.balls[3].get_vy(0.1));
     }
 }
