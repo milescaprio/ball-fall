@@ -302,8 +302,10 @@ impl Space {
         //calculates exit velocities of two objects colliding in one dimension
         (2.0*m2*v2/(m1+m2) + (m1-m2)/(m1+m2)*v1, 2.0*m1*v1/(m1+m2) - (m1-m2)/(m1+m2)*v2)
     }
-    pub fn collide(&mut self, i : usize, j : usize) {
-        //take two balls and bounce them from each other, assuming they are touching
+    pub fn exert_collision(&mut self, i : usize, j : usize) {
+        //take two round balls and bounce them from each other, assuming they are touching
+        //two balls far apart will collide as if one of them is big enough to be touching the other; their size isn't known in this function
+        //if the balls aren't headed towards each other, they won't collide
         
         let (mut b1, mut b2) = Self::two_mut_vals_in_container::<Ball>(&mut self.balls, i, j);
         
@@ -320,9 +322,12 @@ impl Space {
         let (b1vll, b2vll) = (b1v * b1v_θ_ll.cos(), b2v * b2v_θ_ll.cos()); //velocities on collision axis, ll represents parellel
         let (b1vL , b2vL ) = (b1v * b1v_θ_ll.sin(), b2v * b2v_θ_ll.sin()); //velocities off collision axis, L represents perpendicular
 
-        // if (!(b1vll > 0.0 && b2vll < 0.0 && b1vll.abs() <= b2vll.abs())) {
-        //     return; //no collision, they aren't exerting force;
-        // }
+        //abort collision if the balls aren't headed towards each other
+        let avll = b1vll;
+        let bvll = b2vll;
+        if !(bvll.abs() > avll.abs() && (bvll < 0.0 || avll > 0.0) || (bvll < 0.0 && avll > 0.0)) {
+            return; //no collision, they aren't exerting force;
+        }
 
         //collide balls
         let (b1vll_f , b2vll_f ) = Self::collision_vs(b1.mass, b2.mass, b1vll , b2vll); //f means final
@@ -390,7 +395,7 @@ impl Space {
         }
         for pair in self.search_collision_pairs() {
             println!("ball {} had collisions with ball {}", pair.0, pair.1);
-            self.collide(pair.0, pair.1);
+            self.exert_collision(pair.0, pair.1);
         }
     }
 
@@ -445,7 +450,7 @@ mod tests {
         myspace.new_ball_unchecked(12.0, 10.0, -1.0, 0.0, 1.0, 1.0, 1.0, 1.0, [1.0,1.0,1.0,1.0]);
         myspace.debug_velocities();
         myspace.debug_positions();
-        myspace.collide(0, 1);
+        myspace.exert_collision(0, 1);
         myspace.debug_velocities();
         myspace.debug_positions();
 

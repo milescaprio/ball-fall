@@ -1,0 +1,9 @@
+Progress:
+-Balls can fall, bounce, and collide in world 1
+
+To Do:
+-Create other worlds with other accelerations and visions, in drive.rs 
+-Fix integration of accelerations in hard_update and its recurhelper function in physics.rs, making rotational accelerations work
+-Use SumFunction and integration with substitution to be able to integrate multiple accelerations, or figure out alternative approach
+-Create force diagrams that will make the balls agree on forces, use more forces, integrate with above
+-add frictional forces???
