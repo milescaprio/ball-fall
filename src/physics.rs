@@ -59,6 +59,41 @@ impl Recalculate {
         }
     }
 }
+pub struct Angle {
+    deg : f32,
+}
+
+pub struct Vector<T> {
+    pub m : T,
+    pub θ : Angle,
+}
+
+pub enum Value {
+    Constant(f32, Units),
+    Function(Box<dyn Function>),
+}
+
+impl Value {
+    pub fn convert(&self, units : Units) -> Option<Value> {
+        match self {
+            Value::Constant(c, u) => Ok(c * u.convert_to(units)),
+            Value::Function(f) => f.eval(0.0).map(|x| x * f.get_units().convert_to(units)),
+        }
+    }
+}
+
+pub struct ForceDiagram {
+    forces : Vec<Vector<Value>>,
+    common_units : Units,
+}
+
+
+
+impl ForceDiagram {
+    pub fn add_component(&mut self, component : Vector<Value>) {
+
+    }
+}
 
 #[derive(Default)]
 pub struct Ball {
@@ -77,9 +112,6 @@ pub struct Ball {
     color : [f32; 4],
 }
 
-pub struct Angle {
-    deg : f32,
-}
 
 pub struct Space {
     time_units : Units,
@@ -96,14 +128,28 @@ pub struct Space {
     pub balls: Vec<Ball>,
     //pub last_ball_poses : Vec<(f32, f32)>,
 }
-
 impl Angle {
-    fn new(deg : f32) -> Angle {
+    pub fn from_deg(deg : f32) -> Angle {
         Angle { deg }
     }
-    fn xy_h(&self, h : f32) -> (f32, f32) {
+    pub fn from_rad(rad : f32) -> Angle {
+        Angle { deg : rad.to_degrees() }
+    }
+    pub fn xy_h(&self, h : f32) -> (f32, f32) {
         let rad = self.deg.to_radians();
         (rad.cos() * h, rad.sin() * h)
+    }
+    pub fn get_rad(&self) -> f32 {
+        self.deg.to_radians()
+    }
+    pub fn get_deg(&self) -> f32 {
+        self.deg
+    }
+    pub fn set_deg(&mut self, deg : f32) {
+        self.deg = deg;
+    }
+    pub fn set_rad(&mut self, rad : f32) {
+        self.deg = rad.to_degrees();
     }
 }
 
@@ -129,41 +175,41 @@ impl Ball {
         self.fy = FunctionCache::new(fcy);
         Ok(())
     }
-    fn recurhelper_hard_update_unchecked(&self, a_ref : &AccelxyFunction) -> (Box<dyn Function>, Box<dyn Function>) {
-        if let AccelxyFunction::ParterFunctionVector(a, d) = a_ref {
-            let cached_d_dyn_function = a .integrated(Var::S).unwrap().integrated(Var::S).unwrap();
-            return (
-                cached_d_dyn_function.stretch_vert(d.xy_h(1.).0),
-                cached_d_dyn_function.stretch_vert(d.xy_h(1.).1)
-            );
-        }
-        else if let AccelxyFunction::IndependentFunctions(ax, ay) = a_ref {
-            return (
-                ax.integrated(Var::X).unwrap().integrated(Var::X).unwrap(),
-                ay.integrated(Var::Y).unwrap().integrated(Var::Y).unwrap()
-            );
-        }
-        else if let AccelxyFunction::CompositeAcceleration(a1, a2) = a_ref {
-            let xy1 = self.recurhelper_hard_update_unchecked(&a1);
-            let xy2 = self.recurhelper_hard_update_unchecked(&a2);
-            (
-                Box::new(SumFunction::from_compatible(xy1.0,xy2.0).unwrap()),
-                Box::new(SumFunction::from_compatible(xy1.1,xy2.1).unwrap()),
-            )
-        }
-        else {
-            panic!("Unknown AccelxyFunction variant!");
-        }
-    }
+    // fn recurhelper_hard_update_unchecked(&self, a_ref : &AccelxyFunction) -> (Box<dyn Function>, Box<dyn Function>) {
+    //     if let AccelxyFunction::ParterFunctionVector(a, θ) = a_ref {
+    //         let cached_d_dyn_function = a .integrated(Var::S).unwrap().integrated(Var::S).unwrap();
+    //         return (
+    //             cached_d_dyn_function.stretch_vert(θ.xy_h(1.).0),
+    //             cached_d_dyn_function.stretch_vert(θ.xy_h(1.).1)
+    //         );
+    //     }
+    //     else if let AccelxyFunction::IndependentFunctions(ax, ay) = a_ref {
+    //         return (
+    //             ax.integrated(Var::X).unwrap().integrated(Var::X).unwrap(),
+    //             ay.integrated(Var::Y).unwrap().integrated(Var::Y).unwrap()
+    //         );
+    //     }
+    //     else if let AccelxyFunction::CompositeAcceleration(a1, a2) = a_ref {
+    //         let xy1 = self.recurhelper_hard_update_unchecked(&a1);
+    //         let xy2 = self.recurhelper_hard_update_unchecked(&a2);
+    //         (
+    //             Box::new(SumFunction::from_compatible(xy1.0,xy2.0).unwrap()),
+    //             Box::new(SumFunction::from_compatible(xy1.1,xy2.1).unwrap()),
+    //         )
+    //     }
+    //     else {
+    //         panic!("Unknown AccelxyFunction variant!");
+    //     }
+    // }
     pub fn hard_update_unchecked(&mut self, a_ref : &AccelxyFunction, xi : f32, yi : f32, vxi : f32, vyi : f32, t : Recalculate) {
         use AccelxyFunction::*;
         match a_ref {
             ParterFunctionVector(a, d) => {
-                todo!();
-                let cached_d_dyn_function = a .integrated(Var::X).unwrap().integrated(Var::Y).unwrap();
-                self.cached_x_dyn_function = Some(cached_d_dyn_function.stretch_vert(d.xy_h(1.0).0));
-                self.cached_y_dyn_function = Some(cached_d_dyn_function.stretch_vert(d.xy_h(1.0).1));
-                self.soft_update_unchecked();
+                // todo!();
+                // let cached_d_dyn_function = a .integrated(Var::X).unwrap().integrated(Var::Y).unwrap();
+                // self.cached_x_dyn_function = Some(cached_d_dyn_function.stretch_vert(d.xy_h(1.0).0));
+                // self.cached_y_dyn_function = Some(cached_d_dyn_function.stretch_vert(d.xy_h(1.0).1));
+                // self.soft_update_unchecked();
             }
             IndependentFunctions(ax, ay) => {
                 if let MaybeNew::Update(x) = t.val.0 {
@@ -177,16 +223,16 @@ impl Ball {
                 self.soft_update_unchecked();
             }
             CompositeAcceleration(a1, a2) => {
-                todo!();
-                //we have two accelerations and need to integrated each parts individually, both xnet and ynet
-                //we calculate x and y from a1 and x and y from a2 recursively then throw them into a self.cached_x_dyn_function and self.cached_y_dyn_function
+                // todo!();
+                // //we have two accelerations and need to integrated each parts individually, both xnet and ynet
+                // //we calculate x and y from a1 and x and y from a2 recursively then throw them into a self.cached_x_dyn_function and self.cached_y_dyn_function
 
-                //todo: initial velocities work here
-                let xy1 = self.recurhelper_hard_update_unchecked(a1);
-                let xy2 = self.recurhelper_hard_update_unchecked(a2);
-                self.cached_x_dyn_function = Some(Box::new(SumFunction::from_compatible(xy1.0,xy2.0).unwrap()));
-                self.cached_y_dyn_function = Some(Box::new(SumFunction::from_compatible(xy1.1,xy2.1).unwrap()));
-                self.soft_update_unchecked();
+                // //todo: initial velocities work here
+                // let xy1 = self.recurhelper_hard_update_unchecked(a1);
+                // let xy2 = self.recurhelper_hard_update_unchecked(a2);
+                // self.cached_x_dyn_function = Some(Box::new(SumFunction::from_compatible(xy1.0,xy2.0).unwrap()));
+                // self.cached_y_dyn_function = Some(Box::new(SumFunction::from_compatible(xy1.1,xy2.1).unwrap()));
+                // self.soft_update_unchecked();
             }
         }
     }

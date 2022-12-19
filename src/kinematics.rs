@@ -13,6 +13,7 @@ pub enum Var {
 }
 
 const UNIQUE_UNIT_COUNT : usize = 3;
+const UNIQUE_DIMENSION_COUNT : usize = 3;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum Unit {
@@ -27,10 +28,28 @@ pub struct Units {
 }
 
 impl Unit {
+    const conversion_table : [[Option<f32>; UNIQUE_UNIT_COUNT]; UNIQUE_UNIT_COUNT] = [
+        [Some(1.0),  None,       None],
+        [None,       Some(1.0),  None],
+        [None,       None,       Some(1.0)]
+    ];
+    const dimension_tables : [usize; UNIQUE_UNIT_COUNT] = [
+        //matching dimensions can be converted
+        //dimension numbers MUST BE EQUAL TO THE INDEX OF THE MAIN UNIT EXAMPLE
+        0, //m, distance
+        1, //s, time
+        2, //kg, mass
+    ];
+    //first index is current unit, second index is new unit. Represents how many of the new unit are in one of the current unit. 
+    //eg yard to feet 3f (new) = y (old) so 3. Avoid getting backwards.
     pub fn units(&self) -> Units {
         let mut ret = Units::empty();
         ret.exponents[*self as usize] = 1;
         ret
+    }
+    pub fn convert(val : f32, current : &Unit, new : &Unit) -> Option<f32> {
+        let conv = Self::conversion_table[*current as usize][*new as usize];
+        Some(conv? * val)
     }
 }
 
@@ -44,6 +63,17 @@ impl Units {
         let mut ret = Units::empty();
         for i in 0..UNIQUE_UNIT_COUNT {
             ret.exponents[i] = self.exponents[i] * exp;
+        }
+        ret
+    }
+    pub fn convert(val : f32, current : &Units, new : &Units) -> Option<f32> {
+        let mut ret = val;
+        //degrade into common units first
+        for i in 0..UNIQUE_UNIT_COUNT {
+            if current[i] > new[i] { //decrement current unit 
+                let conv = Unit::conversion_table[i][Unit::dimension_tables[i]];
+                ret *= conv.expect("Conversion/Dimension Table Internal Error");
+            }
         }
         ret
     }
