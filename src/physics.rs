@@ -75,10 +75,10 @@ pub enum Value {
 
 impl Value {
     pub fn convert(&self, units : Units) -> Option<Value> {
-        match self {
-            Value::Constant(c, u) => Ok(c * u.convert_to(units)),
-            Value::Function(f) => f.eval(0.0).map(|x| x * f.get_units().convert_to(units)),
-        }
+        Some(match self {
+            Value::Constant(c, u) => Value::Constant(Units::convert(*c, *u, units)?, units),
+            Value::Function(f) => Value::Function(f.stretch_vert(Units::convert(1.0, f.final_units(), units)?).with_final_units_boxed(units)),
+        })
     }
 }
 

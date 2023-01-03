@@ -33,7 +33,7 @@ impl Unit {
         [None,       Some(1.0),  None],
         [None,       None,       Some(1.0)]
     ];
-    const dimension_tables : [usize; UNIQUE_UNIT_COUNT] = [
+    const dimension_table : [usize; UNIQUE_UNIT_COUNT] = [
         //matching dimensions can be converted
         //dimension numbers MUST BE EQUAL TO THE INDEX OF THE MAIN UNIT EXAMPLE
         0, //m, distance
@@ -47,8 +47,8 @@ impl Unit {
         ret.exponents[*self as usize] = 1;
         ret
     }
-    pub fn convert(val : f32, current : &Unit, new : &Unit) -> Option<f32> {
-        let conv = Self::conversion_table[*current as usize][*new as usize];
+    pub fn convert(val : f32, current : Unit, new : Unit) -> Option<f32> {
+        let conv = Self::conversion_table[current as usize][new as usize];
         Some(conv? * val)
     }
 }
@@ -66,16 +66,32 @@ impl Units {
         }
         ret
     }
-    pub fn convert(val : f32, current : &Units, new : &Units) -> Option<f32> {
+    pub fn convert(val : f32, current : Units, new : Units) -> Option<f32> {
         let mut ret = val;
         //degrade into common units first
+        let mut dimension_diff_counter = [0; UNIQUE_DIMENSION_COUNT];
+        for i in 0..UNIQUE_DIMENSION_COUNT {
+            dimension_diff_counter[i] += new.exponents[i] - current.exponents[i];
+        }
+        if dimension_diff_counter != [0; UNIQUE_DIMENSION_COUNT] {
+            return None;
+        }
         for i in 0..UNIQUE_UNIT_COUNT {
-            if current[i] > new[i] { //decrement current unit 
-                let conv = Unit::conversion_table[i][Unit::dimension_tables[i]];
-                ret *= conv.expect("Conversion/Dimension Table Internal Error");
+            if current.exponents[i] > new.exponents[i] { //decrement current unit down to new
+                let conv_amount = current.exponents[i] - new.exponents[i];
+                //we convert to standard measurement, but don't keep track of how many, because we do a pre-check to see if it's valid to
+                let conv = Unit::conversion_table[i][Unit::dimension_table[i]];
+                ret *= conv.expect("Conversion/Dimension Table Internal Error").powi(conv_amount);
             }
         }
-        ret
+        for i in 0..UNIQUE_UNIT_COUNT {
+            if current.exponents[i] < new.exponents[i] { //increment current unit up to new
+                let conv_amount = new.exponents[i] - current.exponents[i];
+                let conv = Unit::conversion_table[Unit::dimension_table[i]][i];
+                ret /= conv.expect("Conversion/Dimension Table Internal Error").powi(conv_amount);
+            }
+        }
+        Some(ret)
     }
 }
 
@@ -154,9 +170,12 @@ pub enum IntegrationError {
 }
 
 pub trait Function {
+    fn var(&self) -> Var;
     fn var_units(&self) -> Units;
     fn final_units(&self) -> Units;
-    fn var(&self) -> Var;
+    fn var_mut(&mut self) -> &mut Var;
+    fn var_units_mut(&mut self) -> &mut Units;
+    fn final_units_mut(&mut self) -> &mut Units;
     //todo: add resulting var?
     fn check(&self) -> Result<(),FunctionInternalError>;
     fn check_recursive(&self) -> Result<(), FunctionInternalError>;
@@ -176,6 +195,18 @@ pub trait Function {
             Err(FunctionCompatibilityError::InvalidUnits)
         }    
     }
+    fn with_var_boxed(&mut self, new_var : Var) -> Box<dyn Function> {
+        *self.var_mut() = new_var;
+        Box::new(*self)
+    }
+    fn with_var_units_boxed(&mut self, new_var_units : Units) -> Box<dyn Function> {
+        *self.var_units_mut() = new_var_units;
+        Box::new(*self)
+    }
+    fn with_final_units_boxed(&mut self, new_final_units : Units) -> Box<dyn Function> {
+        *self.final_units_mut() = new_final_units;
+        Box::new(*self)
+    } 
 
     fn stretch_vert(&self, n : f32) -> Box<dyn Function>;
     fn stereotype() -> Self where Self : Sized; //can only be called on a variant of Function not just a dyn Function type
@@ -256,6 +287,15 @@ impl Function for Polynomial {
     }    
     fn final_units(&self) -> Units {
         self.final_units
+    }
+    fn var_mut(&mut self) -> &mut Var {
+        &mut self.var
+    }
+    fn var_units_mut(&mut self) -> &mut Units {
+        &mut self.var_units
+    }
+    fn final_units_mut(&mut self) -> &mut Units {
+        &mut self.final_units
     }
     fn check(&self) -> Result<(),FunctionInternalError> {
         let mut i = 0;
