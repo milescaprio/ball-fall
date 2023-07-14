@@ -34,16 +34,13 @@ impl Window {
     pub const RESIZABLE : u32 = 0x2;
     pub const VSYNC : u32 = 0x4;
     pub const DECORATED : u32 = 0x8;
-    pub const FULLSCREEN : u32 = 0x16;
-    pub const SRGB : u32 = 0x32;
-    pub const CONTROLLERS : u32 = 0x64;
-    pub const LAZY : u32 = 0x128;
+    pub const FULLSCREEN : u32 = 0x10;
+    pub const SRGB : u32 = 0x20;
+    pub const CONTROLLERS : u32 = 0x40;
+    pub const LAZY : u32 = 0x80;
     pub const DEFAULT_FLAGS : u32 = Self::EXIT_ON_ESC | Self::RESIZABLE | Self::VSYNC | Self::DECORATED;
 
     pub fn new(width : usize, height : usize) -> Window {
-        //Create a new window
-        //events.set_max_fps(165);
-        //events.set_lazy(true);
         Self {
             width,
             height,
@@ -63,22 +60,19 @@ impl Window {
             "",
             [self.width as u32, self.height as u32],
         ).opengl(OPENGL_VER)
-            //.resizable(FLAGS & Self::RESIZABLE != 0)
+            .resizable(flags & Self::RESIZABLE != 0)
             .exit_on_esc(true)//FLAGS & Self::EXIT_ON_ESC != 0)
             .vsync(true)//FLAGS & Self::VSYNC != 0)
             .title(title)
-            //.fullscreen(flags & Self::FULLSCREEN != 0)
+            .fullscreen(flags & Self::FULLSCREEN != 0)
             .decorated(true)//FLAGS & Self::DECORATED != 0)
-            //.controllers(FLAGS & Self::CONTROLLERS != 0)
-            //.srgb(FLAGS & Self::SRGB != 0)
+            .controllers(flags & Self::CONTROLLERS != 0)
+            .srgb(flags & Self::SRGB != 0)
             .build().unwrap());
         self.events = self.events
             .lazy(false);//FLAGS | Self::LAZY != 0);
         self.gl = Some(GlGraphics::new(OPENGL_VER));
     }   
-    // pub fn edit(&mut self, title : String, FLAGS : u32) {
-    //     //Update the window flags 
-    // }
     pub fn init(width : usize, height : usize, renderf : RenderFunction, updatef : UpdateFunction) -> Window {
         let mut ret = Window::new(width, height);
         ret.renderf = Some(renderf);
@@ -89,7 +83,6 @@ impl Window {
         if self.window.is_none() {
             return;
         }
-        //print_type_of(&mut self.window)
         while let Some(e) = self.events.next(self.window.as_mut().expect("no window")) {
             if let Some(r) = e.render_args() {
                 self.render(&r);
@@ -132,11 +125,9 @@ impl Default for Window {
         let renderf = |rtick : u64, utick : u64, c : graphics::Context, gl : &mut GlGraphics| {
             const COOL_COLOR : [f32; 4] = [0.65, 0.85, 0.13, 1.0];
             const COOL_COLOR2 : [f32; 4] = [0.35, 0.15, 0.87, 1.0];
-            // if self.tick != 0 {
             graphics::clear(COOL_COLOR, gl);
             let rect = graphics::rectangle::square(0.0, 0.0, ((rtick + utick) % 1024) as f64);
             graphics::rectangle(COOL_COLOR2, rect, c.transform, gl)
-            // }
         };
         let updatef = |utick : u64|{
             
@@ -150,9 +141,8 @@ mod tests {
     use super::*;
     #[test]
     fn it_works() {
-        //let mut my_window = Window::new(3,3);
         let mut my_window = Window::default();
-        my_window.begin("Yeet".to_string(), Window::DEFAULT_FLAGS);
+        my_window.begin("Window Test".to_string(), Window::DEFAULT_FLAGS);
         loop {
             my_window.maintain();
         }

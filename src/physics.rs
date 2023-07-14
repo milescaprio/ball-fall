@@ -7,6 +7,8 @@ use kinematics::Units;
 use kinematics::Var;
 use kinematics::EvalFunctionError;
 pub const GRAVITY_MPS2: f32 = -100.81;
+pub const DBG_INFO_ONE_COLLISIONS: bool = false;
+pub const DBG_INFO_TWO_COLLISIONS: bool = true;
 
 struct FunctionCache {
     pub closure: Box<dyn Fn(f32) -> Result<f32, EvalFunctionError>>,
@@ -91,10 +93,8 @@ pub struct Space {
     pub y2: f32,
     pub floor: f32,
     a : AccelxyFunction,
-    //pixelx: fn(f32) -> usize,
     elapsed: f32,
     pub balls: Vec<Ball>,
-    //pub last_ball_poses : Vec<(f32, f32)>,
 }
 
 impl Angle {
@@ -119,8 +119,6 @@ impl Ball {
         //not checking won't result in unsafe code but could create odd function behavior
         self.fx = FunctionCache::new(self.cached_x_dyn_function.as_ref().expect("No cache, unable to soft update!").compile_unchecked());
         self.fy = FunctionCache::new(self.cached_y_dyn_function.as_ref().expect("No cache, unable to soft update!").compile_unchecked());
-        // self.x = x;
-        // self.y = y;
     }
     pub fn soft_update(&mut self) -> Result<(), kinematics::FunctionInternalError> {
         let fcx = self.cached_x_dyn_function.as_ref().expect("No cache, unable to soft update!").compile()?;
@@ -269,7 +267,7 @@ impl Space {
     }
 
     pub fn new_ball_unchecked(&mut self, x : f32, y : f32, vxi : f32, vyi : f32, r : f32, m : f32, b_g : f32, b_f : f32, color : [f32; 4]) {
-        //creates a new ball in the space with given parameters including starting location, velocity,
+        //Creates a new ball in the space with given parameters including starting location, velocity,
         //and radius, mass,
         //ground bounce coefficient (applied to absolute value of velocity when hitting ground or wall), 
         //and free bounce coefficient (applied to change in velocity when hitting another ball)
@@ -286,17 +284,20 @@ impl Space {
     }
 
     fn two_mut_vals_in_container<T>(container : &mut Vec<T>, mut i1 : usize, mut i2 : usize) -> (&mut T, &mut T) {
-        if i1 > i2 {
+        let mut swapped : bool = i1 > i2;
+        if swapped {
             (i1,i2) = (i2,i1);
         }
         if i1 == i2 {
-            panic!("be the same");
+            panic!("Indexes of two_mut_vals_in_container are the same!");
         }
         let first_split = container.split_at_mut(i1 + 1);
         let second_split = first_split.1.split_at_mut(i2 - i1 - 1);
-        // first_split.0[0] = v1;
-        // second_split.1[0] = v2;
-        (&mut first_split.0[0], &mut second_split.1[0])
+        let (mut reta, mut retb) = (&mut first_split.0[i1], &mut second_split.1[0]);
+        if swapped {
+            (retb, reta) = (reta, retb)
+        }
+        (reta,retb)
     }
     fn collision_vs(m1 : f32, m2 : f32, v1 : f32, v2 : f32) -> (f32,f32) {
         //calculates exit velocities of two objects colliding in one dimension
@@ -351,7 +352,6 @@ impl Space {
         let mut ret = Vec::<(usize, usize)>::new();
         for i in 0..(self.balls.len()-1) {
             for j in (i+1)..self.balls.len() {
-                //if (self.balls[i].x - self.balls[j].x) * (self.balls[i].x - self.balls[j].x) + (self.balls[i].y - self.balls[j].y) * (self.balls[i].y - self.balls[j].y) <= self.balls[i].radius + self.balls[j].radius {
                 if (self.balls[i].x - self.balls[j].x).hypot(self.balls[i].y - self.balls[j].y) <= self.balls[i].radius + self.balls[j].radius {
                     ret.push((i,j));
                 }
@@ -364,29 +364,29 @@ impl Space {
         self.elapsed += dt;
         let mut i = 0;
         for ball in &mut self.balls {
-            //keep track of the cached calculus functions
-            //check if last acceleration for ball was different and then recompile the cached calculus polynomial if so
+            //Keep track of the cached calculus functions
+            //Check if last acceleration for ball was different and then recompile the cached calculus polynomial if so
             let (x, y) = ((ball.fx.closure)(self.elapsed - ball.x_reftime), (ball.fy.closure)(self.elapsed - ball.y_reftime));
             ball.x = x.unwrap();
             ball.y = y.unwrap();
             if ball.x - ball.radius < self.x1 {
                 let vx = ball.get_vx(self.elapsed); let vy = ball.get_vy(self.elapsed); let b = ball.get_ground_bounce();
                 if vx < 0.0 {
-                    println!("ball {} had left x collision with x velocity {}, which will be reduced to {}", i, vx, -vx * b);
+                    if DBG_INFO_ONE_COLLISIONS { println!("ball {} had left x collision with x velocity {}, which will be reduced to {}", i, vx, -vx * b); }
                     ball.hard_update_unchecked(&self.a, ball.get_x(), ball.get_y(), -vx * b, vy, Recalculate::x(self.elapsed));
                 }
             }
             if ball.x + ball.radius > self.x2 {
                 let vx = ball.get_vx(self.elapsed); let vy = ball.get_vy(self.elapsed); let b = ball.get_ground_bounce();
                 if vx > 0.0 {
-                    println!("ball {} had right x collision with x velocity {}, which will be reduced to {}", i, vx, -vx * b);
+                    if DBG_INFO_ONE_COLLISIONS { println!("ball {} had right x collision with x velocity {}, which will be reduced to {}", i, vx, -vx * b); }
                     ball.hard_update_unchecked(&self.a, ball.get_x(), ball.get_y(), -vx * b, vy, Recalculate::x(self.elapsed));
                 }
             }
             if ball.y - ball.radius < self.floor {
                 let vx = ball.get_vx(self.elapsed); let vy = ball.get_vy(self.elapsed); let b = ball.get_ground_bounce();
                 if vy < 0.0 {
-                    println!("ball {} had y collision with y velocity {}, which will be reduced to {}", i, vy, -vy * b);
+                    if DBG_INFO_ONE_COLLISIONS { println!("ball {} had y collision with y velocity {}, which will be reduced to {}", i, vy, -vy * b); }
                     ball.hard_update_unchecked(&self.a, ball.get_x(), ball.get_y(), vx, -vy * b, Recalculate::y(self.elapsed));
                 }
             }
@@ -394,7 +394,7 @@ impl Space {
             i += 1;
         }
         for pair in self.search_collision_pairs() {
-            println!("ball {} had collisions with ball {}", pair.0, pair.1);
+            if DBG_INFO_TWO_COLLISIONS {println!("ball {} had collisions with ball {}", pair.0, pair.1);}
             self.exert_collision(pair.0, pair.1);
         }
     }
@@ -438,11 +438,6 @@ mod tests {
         myspace.x2 = 20.0;
         myspace.y1 = -10.0;
         myspace.y2 = 30.0;
-        // myspace.new_ball_unchecked(0.0, 25.0, 5.0, 5.0, 1.0, 1.0, 0.8, 0.99, [1.0,0.0,0.0,1.0]);
-        // myspace.new_ball_unchecked(2.0, 13.0, -5.0, -5.0, 0.5, 0.5, 0.5, 0.99,[0.0,1.0,0.0,1.0]);
-        // myspace.new_ball_unchecked(2.0, 16.0, 0.0, 0.0, 3.0, 5.0, 0.9, 0.99, [0.0,0.0,1.0,1.0]);
-
-        // myspace.tick(1.0);
 
         dbg!(Space::collision_vs(1.0, 1.5, -1.0, 1.0));
 
@@ -454,8 +449,7 @@ mod tests {
         myspace.debug_velocities();
         myspace.debug_positions();
 
-        // myspace.new_ball_unchecked(7.828, 7.828, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0, [1.0,1.0,1.0,1.0]);
-        // myspace.new_ball_unchecked(5.0, 5.0, 1.0, 1.0, 1.0, 1.5, 1.0, 1.0, [1.0,1.0,1.0,1.0]);
-        // myspace.collide(2, 3);
+        myspace.new_ball_unchecked(7.828, 7.828, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0, [1.0,1.0,1.0,1.0]);
+        myspace.new_ball_unchecked(5.0, 5.0, 1.0, 1.0, 1.0, 1.5, 1.0, 1.0, [1.0,1.0,1.0,1.0]);
     }
 }
