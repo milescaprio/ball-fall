@@ -1,6 +1,6 @@
 # ball-fall
 
-A quick & fun 2D physics engine in rust, using Piston, for Lincoln Programming Club.
+A quick & fun 2D physics engine in Rust, using Piston.
 Uses integration and unit conversion for precise & generic positioning. Collisions use conservation of momentum and energy on a rotated axis.
 
 Unfinished. Possible additions in the future:
